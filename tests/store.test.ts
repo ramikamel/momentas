@@ -253,3 +253,21 @@ test("expired pending object maps expose failed status on read and allow retry",
     map: { status: "pending" },
   });
 });
+
+test("explicit refresh replaces a completed object map but cannot steal a pending scan", async () => {
+  const s = createLocalStore(dir);
+  await s.createMemory(memory());
+  await s.reserveRender("m", "render", 4);
+  await s.completeRender("m", "render", version());
+  await s.claimObjectMap("m", "v", "job", false);
+  await s.saveObjectMap("m", "v", "job", [], "complete");
+  expect(await s.claimObjectMap("m", "v", "cached", false)).toMatchObject({
+    claimed: false,
+  });
+  expect(await s.claimObjectMap("m", "v", "refresh", true)).toMatchObject({
+    claimed: true,
+  });
+  expect(
+    await s.claimObjectMap("m", "v", "racing-refresh", true),
+  ).toMatchObject({ claimed: false, map: { status: "pending" } });
+});

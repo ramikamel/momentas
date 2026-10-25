@@ -99,8 +99,15 @@ export function createConnectionSupabaseStore(
             : r.status,
       } as ObjectMap;
     },
-    claimObjectMap: async (memoryId, versionId, requestId, retry) =>
-      req("/rest/v1/rpc/claim_memory_object_map", {
+    claimObjectMap: async (memoryId, versionId, requestId, retry) => {
+      if (retry) {
+        // A user-requested rescan can replace a completed cache, never a pending lease.
+        await req(
+          `/rest/v1/memory_object_maps?memory_id=eq.${encodeURIComponent(memoryId)}&version_id=eq.${encodeURIComponent(versionId)}&status=eq.complete`,
+          { method: "PATCH", body: JSON.stringify({ status: "failed" }) },
+        );
+      }
+      return req("/rest/v1/rpc/claim_memory_object_map", {
         method: "POST",
         body: JSON.stringify({
           p_memory_id: memoryId,
@@ -108,7 +115,8 @@ export function createConnectionSupabaseStore(
           p_request_id: requestId,
           p_retry: retry,
         }),
-      }),
+      });
+    },
     saveObjectMap: async (memoryId, versionId, requestId, objects, status) => {
       await req("/rest/v1/rpc/save_memory_object_map", {
         method: "POST",

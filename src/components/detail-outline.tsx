@@ -7,6 +7,7 @@ export function DetailOutline({
   if (!outline) return null;
   return (
     <svg
+      fillRule="evenodd"
       className="conn-object-outline"
       viewBox="0 0 1000 1000"
       preserveAspectRatio="none"

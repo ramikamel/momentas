@@ -23,6 +23,7 @@ export function MemoryDetailPins({
         <img src={imageUrl} alt={alt} />
         <DetailOutline outline={pins.find((p) => p.id === selected)?.outline} />
         <svg
+          fillRule="evenodd"
           className="conn-exploration-overlay"
           viewBox="0 0 1000 1000"
           preserveAspectRatio="none"
@@ -35,25 +36,23 @@ export function MemoryDetailPins({
             pointerEvents: "none",
           }}
         >
-          {[...pins]
-            .reverse()
-            .map(
-              (pin) =>
-                pin.outline && (
-                  <path
-                    key={pin.id}
-                    d={pin.outline.path}
-                    onClick={() => setSelected(pin.id)}
-                    style={{
-                      pointerEvents: "all",
-                      cursor: "pointer",
-                      fill: selected === pin.id ? "#f8d68830" : "transparent",
-                      stroke: selected === pin.id ? "#fff3cf" : "#fff3cf70",
-                      strokeWidth: 2,
-                    }}
-                  />
-                ),
-            )}
+          {[...pins].reverse().map(
+            (pin) =>
+              pin.outline && (
+                <path
+                  key={pin.id}
+                  d={pin.outline.path}
+                  onClick={() => setSelected(pin.id)}
+                  style={{
+                    pointerEvents: "all",
+                    cursor: "pointer",
+                    fill: selected === pin.id ? "#f8d68830" : "transparent",
+                    stroke: selected === pin.id ? "#fff3cf" : "#fff3cf70",
+                    strokeWidth: 2,
+                  }}
+                />
+              ),
+          )}
         </svg>
         {pins.map((pin, i) => (
           <button

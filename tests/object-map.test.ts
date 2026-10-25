@@ -163,3 +163,78 @@ it("SAM requests leave at least 45 seconds for map persistence within the lease"
   expect(timeout).toHaveBeenCalledWith(30000);
   timeout.mockRestore();
 });
+
+it("keeps successful masks and continues discovery when another concept fails", async () => {
+  const { store } = setup();
+  const found = {
+    id: "helmet-0",
+    label: "helmet",
+    area: 0.03,
+    x: 0.5,
+    y: 0.2,
+    outline: { path: "M0,0L100,0L100,100Z" },
+  };
+  const segment = vi.fn(async (_image, concept: string) => {
+    if (concept === "person") throw Error("timeout");
+    return [{ ...found, id: `${concept}-0`, label: concept }];
+  });
+  const service = new ObjectMapService(
+    store as unknown as Store,
+    async () => ["person", "helmet", "bicycle", "shoe"],
+    segment,
+  );
+  const map = await service.prepare(
+    { memoryId: "m", ownerToken: "owner" },
+    "v",
+  );
+  expect(map?.status).toBe("complete");
+  expect(map?.objects.map((o) => o.label).sort()).toEqual([
+    "bicycle",
+    "helmet",
+    "shoe",
+  ]);
+});
+
+it("treats truncated vision output as a failure instead of caching an empty map", async () => {
+  vi.stubEnv("MODEL_API_KEY", "test");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        choices: [{ finish_reason: "length", message: { content: "" } }],
+      }),
+    ),
+  );
+  const { suggestObjects } = await import("@/lib/server/object-map");
+  await expect(
+    suggestObjects({ bytes: new Uint8Array(), mimeType: "image/png" }),
+  ).rejects.toThrow();
+});
+
+it("preserves usable cached outlines when a requested refresh cannot reserve capacity", async () => {
+  const { store } = setup();
+  const previous = {
+    id: "helmet-0",
+    label: "helmet",
+    area: 0.03,
+    x: 0.5,
+    y: 0.2,
+    outline: { path: "M0,0L100,0L100,100Z" },
+  };
+  store.getObjectMap.mockResolvedValue({
+    status: "complete",
+    objects: [previous],
+  });
+  store.reserveOutlineBatch.mockRejectedValue(Error("capacity reached"));
+  const service = new ObjectMapService(store as unknown as Store, async () => [
+    "helmet",
+  ]);
+  await service.prepare({ memoryId: "m", ownerToken: "owner" }, "v", true);
+  expect(store.saveObjectMap).toHaveBeenLastCalledWith(
+    "m",
+    "v",
+    expect.any(String),
+    [previous],
+    "failed",
+  );
+});

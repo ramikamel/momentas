@@ -104,37 +104,59 @@ export async function objectsFromText(
     )
       throw new Error("Invalid mask bounds");
     const raw = decodeMaskToSVGPath(record.mask);
-    const paths: string[] = [];
-    for (const contour of raw.split(/(?=M)/)) {
-      const n = contour.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
-      if (n.length < 6) continue;
-      const points: Point[] = [];
-      for (let i = 0; i < n.length; i += 2)
-        points.push({ x: n[i] + b.left, y: n[i + 1] + b.top });
-      // Split a closed contour at its furthest point before simplifying it.
-      let split = 1;
-      for (let i = 2; i < points.length; i++)
-        if (
-          (points[i].x - points[0].x) ** 2 + (points[i].y - points[0].y) ** 2 >
-          (points[split].x - points[0].x) ** 2 +
-            (points[split].y - points[0].y) ** 2
-        )
-          split = i;
-      const simplified = [
-        ...simplify(points.slice(0, split + 1), 1.5).slice(0, -1),
-        ...simplify([...points.slice(split), points[0]], 1.5).slice(0, -1),
-      ];
-      if (simplified.length < 3) continue;
-      paths.push(
-        simplified
-          .map(
-            (p, i) =>
-              `${i ? "L" : "M"}${Math.round(Math.max(0, Math.min(1000, (p.x / width) * 1000)))},${Math.round(Math.max(0, Math.min(1000, (p.y / height) * 1000)))}`,
+    function pathAtTolerance(tolerance: number) {
+      const paths: string[] = [];
+      for (const contour of raw.split(/(?=M)/)) {
+        const n = contour.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
+        if (n.length < 6) continue;
+        const points: Point[] = [];
+        for (let i = 0; i < n.length; i += 2)
+          points.push({ x: n[i] + b.left, y: n[i + 1] + b.top });
+        // Split a closed contour at its furthest point before simplifying it.
+        let split = 1;
+        for (let i = 2; i < points.length; i++)
+          if (
+            (points[i].x - points[0].x) ** 2 +
+              (points[i].y - points[0].y) ** 2 >
+            (points[split].x - points[0].x) ** 2 +
+              (points[split].y - points[0].y) ** 2
           )
-          .join("") + "Z",
-      );
+            split = i;
+        const simplified = [
+          ...simplify(points.slice(0, split + 1), tolerance).slice(0, -1),
+          ...simplify([...points.slice(split), points[0]], tolerance).slice(
+            0,
+            -1,
+          ),
+        ];
+        if (simplified.length < 3) continue;
+        paths.push(
+          simplified
+            .map(
+              (p, i) =>
+                `${i ? "L" : "M"}${Math.round(Math.max(0, Math.min(1000, (p.x / width) * 1000)))},${Math.round(Math.max(0, Math.min(1000, (p.y / height) * 1000)))}`,
+            )
+            .join("") + "Z",
+        );
+      }
+      return paths.join("");
     }
-    if (!paths.length) continue;
+    // Keep fine boundaries first; simplify only if the durable outline budget requires it.
+    const initialTolerance = Math.min(
+      0.75,
+      Math.max(0.1, Math.min(b.right - b.left, b.bottom - b.top) / 100),
+    );
+    let outline: ObjectOutline | null = null;
+    for (const tolerance of [initialTolerance, 1.5, 3, 6, 12]) {
+      const candidate = outlineSchema.safeParse({
+        path: pathAtTolerance(tolerance),
+      });
+      if (candidate.success) {
+        outline = candidate.data;
+        break;
+      }
+    }
+    if (!outline) continue;
     const raster = decodeMaskToRaster(record.mask);
     const area =
       raster.reduce((n, value) => n + (value ? 1 : 0), 0) / (width * height);
@@ -144,7 +166,7 @@ export async function objectsFromText(
       x: (b.left + b.right) / (2 * width),
       y: (b.top + b.bottom) / (2 * height),
       area,
-      outline: outlineSchema.parse({ path: paths.join("") }),
+      outline,
     });
   }
   return objects;
@@ -177,8 +199,8 @@ export async function segmentImage(
   })
     .rotate()
     .resize({
-      width: 768,
-      height: 768,
+      width: 1024,
+      height: 1024,
       fit: "inside",
       withoutEnlargement: true,
     })

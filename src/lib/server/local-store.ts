@@ -207,7 +207,7 @@ export function createLocalStore(directory: string): Store {
         let map = maps[vid];
         if (map?.status === "pending" && map.expiresAt <= Date.now())
           map.status = "failed";
-        if (map && (map.status !== "failed" || !retry)) {
+        if (map && (map.status === "pending" || !retry)) {
           const { requestId: _id, expiresAt: _expiry, ...view } = map;
           void _id;
           void _expiry;

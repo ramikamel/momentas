@@ -64,6 +64,7 @@ export function PhotoMemoryWorkspace({
     [notice, setNotice] = useState(""),
     [objects, setObjects] = useState<DetectedObject[]>([]),
     [preparing, setPreparing] = useState(true),
+    [scan, setScan] = useState(0),
     [manual, setManual] = useState(false),
     [retarget, setRetarget] = useState(false),
     [concept, setConcept] = useState(""),
@@ -120,13 +121,17 @@ export function PhotoMemoryWorkspace({
       try {
         const data = await request<{
           map: ObjectMap | null;
-        }>(`${vbase}/objects`, prepare ? {} : undefined);
+        }>(`${vbase}/objects`, prepare ? { retry: scan > 0 } : undefined);
         if (!alive) return;
         if (!data.map && !prepare) {
           void load(true);
           return;
         }
         setObjects(data.map?.objects || []);
+        if (scan > 0 && data.map?.status === "failed")
+          setNotice(
+            "Could not refresh outlines. Existing details are safe; try searching for one object.",
+          );
         setPreparing(data.map?.status === "pending");
         if (data.map?.status === "pending")
           timer = setTimeout(() => void load(), 2000);
@@ -137,12 +142,13 @@ export function PhotoMemoryWorkspace({
         }
       }
     }
-    void load();
+    setPreparing(true);
+    void load(scan > 0);
     return () => {
       alive = false;
       clearTimeout(timer);
     };
-  }, [vbase]);
+  }, [vbase, scan]);
   const draft = drafts[active] || fresh(active);
   const notes = Object.values(drafts).filter((d) => d.key.startsWith("note:"));
   async function save(
@@ -337,6 +343,7 @@ export function PhotoMemoryWorkspace({
           >
             <img src={version.imageUrl} alt="Your original photograph" />
             <svg
+              fillRule="evenodd"
               viewBox="0 0 1000 1000"
               preserveAspectRatio="none"
               aria-hidden="true"
@@ -385,9 +392,17 @@ export function PhotoMemoryWorkspace({
             Your original photograph ·{" "}
             {preparing
               ? "Finding little details…"
-              : "Tap a detail to give it a story."}
+              : objects.length
+                ? "Tap a detail to give it a story."
+                : "No outlines yet. Refresh or search for a specific detail."}
           </p>
           <div className="photo-objects">
+            <button
+              disabled={preparing || busy || saving || finding || !loaded}
+              onClick={() => setScan((current) => current + 1)}
+            >
+              {preparing ? "Finding details…" : "Refresh outlines"}
+            </button>
             {objects.map((o) => (
               <button
                 disabled={busy || saving || !loaded}

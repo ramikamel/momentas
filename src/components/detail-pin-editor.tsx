@@ -36,6 +36,7 @@ export function DetailPinEditor({
     [objects, setObjects] = useState<DetectedObject[]>([]),
     [concept, setConcept] = useState(""),
     [preparing, setPreparing] = useState(true),
+    [scan, setScan] = useState(0),
     [manual, setManual] = useState(false);
   const objectUrl = `/api/memories/${memoryId}/versions/${version.id}/objects`;
   useEffect(() => {
@@ -49,7 +50,7 @@ export function DetailPinEditor({
             ? {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: "{}",
+                body: JSON.stringify({ retry: scan > 0 }),
               }
             : undefined,
         );
@@ -75,12 +76,13 @@ export function DetailPinEditor({
         }
       }
     }
-    void load();
+    setPreparing(true);
+    void load(scan > 0);
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [objectUrl]);
+  }, [objectUrl, scan]);
   function chooseObject(object: DetectedObject) {
     stopOutline();
     setAdding(true);
@@ -255,6 +257,7 @@ export function DetailPinEditor({
         <DetailOutline outline={outline} />
         {!manual && (
           <svg
+            fillRule="evenodd"
             className="object-map-overlay"
             viewBox="0 0 1000 1000"
             preserveAspectRatio="none"
@@ -373,35 +376,16 @@ export function DetailPinEditor({
                 ? "Choose an outlined object, then tell its story."
                 : "No objects found. Search for an object or place a pin."}
         </p>
-        {objectMap?.status === "failed" && (
-          <button
-            type="button"
-            className="conn-link"
-            disabled={preparing}
-            onClick={async () => {
-              setPreparing(true);
-              try {
-                const r = await fetch(objectUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ retry: true }),
-                });
-                const d = await r.json();
-                if (!r.ok) throw new Error();
-                setObjectMap(d.map);
-                setObjects(d.map?.objects || []);
-              } catch {
-                setOutlineNotice(
-                  "Could not prepare objects. You can still place a pin.",
-                );
-              } finally {
-                setPreparing(false);
-              }
-            }}
-          >
-            Retry preparation
-          </button>
-        )}
+        <button
+          type="button"
+          className="conn-link"
+          disabled={preparing || busy || finding}
+          onClick={() => setScan((current) => current + 1)}
+        >
+          {objectMap?.status === "failed"
+            ? "Retry preparation"
+            : "Refresh outlines"}
+        </button>
         <div className="object-map-buttons">
           {objects.map((object, i) => (
             <button

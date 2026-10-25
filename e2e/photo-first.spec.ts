@@ -46,6 +46,22 @@ test("a photograph starts without metadata and detail drafts survive switching a
   await expect(
     page.getByLabel("What do you remember about this?", { exact: true }),
   ).toHaveValue("That helmet was a birthday present.");
+  const rescan = page.waitForRequest(
+    (r) =>
+      r.url().endsWith("/objects") &&
+      r.method() === "POST" &&
+      r.postDataJSON()?.retry === true,
+  );
+  await page
+    .getByRole("button", { name: "Refresh outlines", exact: true })
+    .click();
+  await rescan;
+  await expect(
+    page.getByRole("button", { name: "helmet", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("What do you remember about this?", { exact: true }),
+  ).toHaveValue("That helmet was a birthday present.");
   await page.reload();
   await page
     .getByRole("button", { name: "Add stories to details", exact: true })
