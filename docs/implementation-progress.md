@@ -48,3 +48,18 @@ The project is now **momentas**. The shared Muse image directive defaults to a c
 The public app, repository links, package metadata and judging materials use the new name. A real fictional Muse generation/edit smoke check refreshes the landing sample. New provider-boundary tests cover both endpoints receiving the photography directive alongside approved details and revision instructions.
 
 Verification for this update: 27 unit/integration tests passed; lint, TypeScript and production build passed; the complete isolated browser journey passed (including failed-edit recovery, sharing, human replies and private draft access). Live Muse extraction/generation/edit succeeded in 15.4 / 34.1 / 20.8 seconds. Both new images were visually checked and show photographic rather than storybook rendering. These timings are single observations.
+
+
+## Connection extension implementation (2026-10-24)
+
+Implemented on isolated `feat/connection-features` from `dfd3167`: shared publication snapshots with additive 002 migration/backfill; optional canonical WAV capture/transcription/private storage; selected quote pins and publication-scoped messages; capability-scoped one-contribution invitation; independently authored photographic perspectives; cached source-validated Spark synthesis; responsive reveal and real human reply flow.
+
+The user confirmed the 002 migration succeeded in Supabase. A local PostgreSQL-compatible check exercised 001 + 002 backfill, pins, narration, request reservations, publication, concurrent-safe/idempotent claim, synthesis, reply context, same-image stale-publication rejection, and frozen comparison messaging. The real Supabase service lifecycle also passed including private audio and a contextual question/reply. A published speech fixture was used solely to test transcription, kept private and outside the repository/showcase; live VoiceService upload/reserve/transcribe/persist passed. Real Muse Spark comparison returned validated evidence. Voice API requests use explicitly typed JSON multipart settings; Spark comparisons use low reasoning and a bounded output budget.
+
+Ruling: native worktree creation used the chat's stale original folder and reported Not a git repository; a manual isolated worktree from the actual repository was used instead. Cost if wrong: checkout confusion; the base commit and branch were explicitly verified.
+
+Ruling: all three low-reasoning subagents reached the account usage limit after partial work, so the high-reasoning orchestrator completed the work directly and reviewed the integration, authorization and SQL. Cost if wrong: less independent review; compensated with service tests, two-browser journeys, live services and explicit ownership/race checks.
+
+Ruling: local Turbopack production compilation could not bind its helper port under the host sandbox. The supported webpack production builder passed; hosted Vercel compilation is separately verified at release. No product dependency or remote runtime workaround was introduced.
+
+The fictional showcase has two distinct real Muse images (existing child view and one new father view), quote pins and cached insights. It deliberately contains no fabricated narrator voices: the presenter can add their actual recordings through the app. Owner capabilities, downloaded test speech, screenshots, and prepared files remain ignored.

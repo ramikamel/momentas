@@ -20,7 +20,7 @@ npm run dev
 
 Configure `MODEL_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` (an existing `.env` works). Supabase accepts a project-root URL or its `/rest/v1` endpoint. Use the server-side secret/service-role key; never expose it with a `NEXT_PUBLIC_` prefix.
 
-Run `supabase/migrations/001_memories.sql` once in the new project's SQL Editor. It creates private tables, atomic render/message RPCs and the private `memory-images` bucket. The REST service key cannot execute schema SQL.
+Run `supabase/migrations/001_memories.sql`, then `supabase/migrations/002_connection_features.sql`, once in the project's SQL Editor. Existing projects with 001 applied need only the additive 002 migration. It creates private tables, atomic render/message RPCs and the private `memory-images` bucket. The REST service key cannot execute schema SQL.
 
 Open http://localhost:3000. Without Supabase credentials, development persists in `.data`; production requires Supabase. Editing access lives in an HttpOnly browser cookie for 30 days. Anyone with a published link can view that version and leave a question. Later draft edits stay private until publication.
 
@@ -31,7 +31,9 @@ Open http://localhost:3000. Without Supabase credentials, development persists i
 - The shared `imageGenerationInstruction` in `src/lib/memory/prompts.ts` applies to both generation and edits. It defaults to a candid, photorealistic camera image with natural light and lifelike textures, discourages comic/painted aesthetics, and converts stylized reference images to photographic realism during editing. The Images API accepts this direction in `prompt`, rather than a chat `system` role.
 - The UI identifies generated scenes as AI reconstructions, not original photographs. Unknown facial likenesses are not promised.
 - People ask and answer questions. Models do not impersonate relatives or answer autobiographical questions.
-- Voice input is deferred. Typed input supports the complete MVP.
+- Muse Voice Transcribe (`muse-voice-transcribe-1.0`) turns an optional 1–60 second recording into text the storyteller reviews. Recordings stay private unless explicitly included when publishing. Original recorded audio and transcript are retained separately from the edited memory.
+- Up to five storyteller-positioned image pins reveal selected verbatim source excerpts and give questions a specific context.
+- A scoped invitation lets one other person create their own account in the same editor before a two-perspective reveal. Muse Spark compares only the two approved public captions/pin quotes, cites each account, and caches the result. Human replies remain personally written.
 
 The first live smoke check observed extraction in 11.6 seconds, generation in 48.0 seconds, and editing in 17.2 seconds. This is one observation, not a latency promise. Its initial artwork repeated one person across time; the edit corrected that and prompts now explicitly request one moment and each person once. Author review remains essential.
 
@@ -59,6 +61,19 @@ Vercel production needs the three required secrets, configured in its encrypted 
 
 `MAX_IMAGE_REQUESTS=24` caps all reserved image attempts across the database, including failures. This is not a dollar limit. Concurrency and reservation checks are atomic. Inspect credit before raising it. `.vercelignore` excludes local secrets, editing capabilities, fixtures, scratch files and test outputs.
 
-Prototype limitations: browser-bound editing without account recovery, unlisted bearer links rather than verified recipient identities, variable image latency and consistency. Notifications, streaming voice, animation, face matching, multiple styles, two-perspective comparisons and blockchain are deferred.
+Prototype limitations: browser-bound editing without account recovery, unlisted bearer links rather than verified recipient identities, variable image latency and consistency. Notifications, live-streaming transcription, animation, face matching, multiple styles, and blockchain are deferred.
 
 See `docs/demo-script.md` and `docs/submission-draft.md` for judging materials.
+
+
+## Connection features
+
+Start with **Start with my voice instead**, or use **Record my memory** inside the editor. **Use transcript** deliberately replaces the written account and clears scene approval. Images can carry up to five optional source-linked pins under **Add details someone can discover**. Save the pins, then publish; **Include my recorded voice and its original transcript** defaults off.
+
+After publication, **Invite another perspective** creates a neutral invitation for one additional account. The invite link grants creation/resumption of that contribution; it is not verified identity. Each person reviews and publishes their own image, then explicitly attaches that approved snapshot to the comparison. Captions, selected pins, and opted-in narration are frozen in that comparison. Later ordinary edits do not silently change it. Pin questions and human replies remain attached to the publication they refer to.
+
+`MAX_VOICE_REQUESTS=24` and `MAX_COMPARISON_REQUESTS=24` cap persisted provider attempts separately; the existing image cap remains 24. Pages never trigger paid comparison generation on reload. Failed provider calls preserve clips, words and images; retries are explicit. These caps are attempt counts, not dollar budgets.
+
+`npx tsx scripts/check-voice.ts <local-canonical-wav>` performs one live voice call without logging speech text. `npx tsx scripts/check-comparison.ts` performs one live comparison of two fictional captions. `npx tsx scripts/check-connections.ts [scene-json] [prepared-webp]` checks migrated Supabase persistence using prepared real art without making image-generation calls; it is not a demonstration of two newly generated perspectives. These scripts spend provider credit where explicitly noted. Local owner capabilities stay in ignored `.data` files.
+
+The browser suite covers actual capture with a controlled microphone fixture, transcript review, opted-in audio, pins, independent contribution, comparison, contextual question/reply, and denied-microphone recovery. Live checks separately verified the real voice provider and the complete Supabase storage/reservation path. A fictional showcase uses the earlier real child-view Muse output plus a newly generated father-view image; the presenter should record their own narration rather than use synthesized or borrowed speech as a family member.

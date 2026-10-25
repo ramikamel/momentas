@@ -13,6 +13,7 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".next-e2e/**",
+    ".superpowers/**",
     "node_modules/**",
     ".data/**",
     "test-results/**",

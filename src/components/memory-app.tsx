@@ -26,6 +26,11 @@ import type {
   ScenePlan,
   SourcedDetail,
 } from "@/lib/memory/types";
+import { VoiceRecorder } from "./voice-recorder";
+import { MemoryVoicePlayer } from "./memory-voice-player";
+import { DetailPinEditor, MemoryDetailPins } from "./memory-detail-pins";
+import { PerspectiveControls } from "./perspective-controls";
+import type { PublicPin } from "@/lib/memory/connections";
 const empty: DraftInput = {
   title: "",
   authorName: "",
@@ -208,6 +213,31 @@ export function Landing() {
       setBusy(false);
     }
   }
+  async function startVoice() {
+    if (
+      !draft.title.trim() ||
+      !draft.authorName.trim() ||
+      !draft.recipientName.trim()
+    ) {
+      setError(
+        "Add a title, your name and who this memory is for, then start recording.",
+      );
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api<{ id: string }>("/api/memories", {
+        ...draft,
+        story: "",
+        scenePlan: null,
+      });
+      router.push(`/memory/${r.id}`);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
   return (
     <>
       <Header />
@@ -254,17 +284,19 @@ export function Landing() {
           <div>
             <span className="section-number">01</span>
             <h3>Remember it.</h3>
-            <p>A place. A person. One detail you never forgot.</p>
+            <p>Write it down, or tell it in your own voice.</p>
           </div>
           <div>
             <span className="section-number">02</span>
             <h3>Make it yours.</h3>
-            <p>Review the details and recreate a moment that feels real.</p>
+            <p>Recreate the moment. Leave details someone can discover.</p>
           </div>
           <div>
             <span className="section-number">03</span>
             <h3>Let them in.</h3>
-            <p>Share your perspective. Leave room for a real conversation.</p>
+            <p>
+              Invite their side of the story. Find what you remember together.
+            </p>
           </div>
         </section>
         <section className="begin-section" id="begin">
@@ -295,6 +327,14 @@ export function Landing() {
             >
               {busy ? "Saving your memory…" : "Save & review the scene"}
               <ArrowRight size={18} />
+            </button>
+            <button
+              type="button"
+              className="button subtle wide"
+              disabled={busy}
+              onClick={startVoice}
+            >
+              Start with my voice instead
             </button>
             <p className="form-note">
               Your draft stays private. You decide when to share.
@@ -400,6 +440,11 @@ function MessageList({
                     : ""}
               </span>
             </div>
+            {m.pinContext && (
+              <blockquote className="conn-evidence">
+                About {m.pinContext.label}: “{m.pinContext.sourceQuote}”
+              </blockquote>
+            )}
             <p>{m.text}</p>
             {messages
               .filter((r) => r.parentId === m.id)
@@ -445,6 +490,7 @@ export function Workspace({ id }: { id: string }) {
     [selected, setSelected] = useState(""),
     [instruction, setInstruction] = useState(""),
     [caption, setCaption] = useState(""),
+    [includeNarration, setIncludeNarration] = useState(false),
     [shareUrl, setShareUrl] = useState(""),
     [copied, setCopied] = useState(false),
     [reply, setReply] = useState<Record<string, string>>({});
@@ -460,6 +506,7 @@ export function Workspace({ id }: { id: string }) {
             authorName: m.authorName,
             recipientName: m.recipientName,
             story: m.story,
+            narrationId: m.narrationId ?? null,
             scenePlan: m.scenePlan,
           });
           setSelected(m.versions.at(-1)?.id || "");
@@ -631,6 +678,21 @@ export function Workspace({ id }: { id: string }) {
                     void extract();
                   }}
                 >
+                  <VoiceRecorder
+                    memoryId={id}
+                    onUse={(value) => {
+                      setDraft({
+                        ...draft,
+                        story: value.story,
+                        narrationId: value.narrationId,
+                        scenePlan: null,
+                      });
+                      setApproved(false);
+                    }}
+                    onSelect={(narrationId) =>
+                      setDraft({ ...draft, narrationId })
+                    }
+                  />
                   <StoryFields draft={draft} setDraft={setDraft} />
                   <div className="action-row">
                     <button
@@ -640,7 +702,11 @@ export function Workspace({ id }: { id: string }) {
                     >
                       Save draft
                     </button>
-                    <button className="button primary" type="submit">
+                    <button
+                      className="button primary"
+                      type="submit"
+                      disabled={!draft.story.trim()}
+                    >
                       Review the scene <ArrowRight size={17} />
                     </button>
                   </div>
@@ -735,12 +801,24 @@ export function Workspace({ id }: { id: string }) {
                     </span>
                   </div>
                 )}
+                {version && (
+                  <details className="conn-editor">
+                    <summary>Add details someone can discover</summary>
+                    <DetailPinEditor
+                      key={version.id}
+                      memoryId={id}
+                      version={version}
+                      initialPins={memory.pinsByVersion?.[version.id] ?? []}
+                      onSaved={() => {
+                        void load();
+                      }}
+                    />
+                  </details>
+                )}
                 <div className="version-bar">
                   <span>
                     {memory.versions.length} saved{" "}
-                    {memory.versions.length === 1
-                      ? "image"
-                      : "images"}
+                    {memory.versions.length === 1 ? "image" : "images"}
                   </span>
                   <div>
                     {memory.versions.map((v, i) => (
@@ -852,7 +930,8 @@ export function Workspace({ id }: { id: string }) {
                         </span>
                         <h2>{draft.title}</h2>
                         <p>
-                          An AI memory reconstruction, shaped by {draft.authorName}.
+                          An AI memory reconstruction, shaped by{" "}
+                          {draft.authorName}.
                         </p>
                       </div>
                     </div>
@@ -867,6 +946,34 @@ export function Workspace({ id }: { id: string }) {
                         placeholder="This is how I remember that afternoon. What do you remember?"
                       />
                     </Field>
+                    {draft.narrationId && (
+                      <>
+                        <label className="approval">
+                          <input
+                            type="checkbox"
+                            checked={includeNarration}
+                            onChange={(e) =>
+                              setIncludeNarration(e.target.checked)
+                            }
+                          />
+                          <span>
+                            Include my recorded voice and its original
+                            transcript
+                          </span>
+                        </label>
+                        {memory.narrations?.find(
+                          (n) => n.id === draft.narrationId,
+                        ) && (
+                          <MemoryVoicePlayer
+                            narration={
+                              memory.narrations.find(
+                                (n) => n.id === draft.narrationId,
+                              )!
+                            }
+                          />
+                        )}
+                      </>
+                    )}
                     <p className="link-notice">
                       Anyone with this link can view this memory and leave a
                       question. Your draft and other images stay private.
@@ -879,7 +986,7 @@ export function Workspace({ id }: { id: string }) {
                           await save();
                           const r = await api<{ shareUrl: string }>(
                             `${base}/publish`,
-                            { versionId: selected, caption },
+                            { versionId: selected, caption, includeNarration },
                           );
                           setShareUrl(r.shareUrl);
                           await load();
@@ -933,6 +1040,7 @@ export function Workspace({ id }: { id: string }) {
                     )}
                   </div>
                 </div>
+                <PerspectiveControls memory={memory} onRefresh={() => load()} />
                 <section className="conversation">
                   <div className="conversation-heading">
                     <div>
@@ -992,6 +1100,7 @@ export function SharedMemory({ token }: { token: string }) {
   const [memory, setMemory] = useState<PublishedMemoryView | null>(null),
     [error, setError] = useState(""),
     [name, setName] = useState(""),
+    [selectedPin, setSelectedPin] = useState<PublicPin | null>(null),
     [text, setText] = useState(""),
     [busy, setBusy] = useState("");
   const base = `/api/share/${token}`;
@@ -1043,11 +1152,21 @@ export function SharedMemory({ token }: { token: string }) {
               </p>
             </div>
             <div className="shared-image">
-              <img
-                src={memory.imageUrl}
+              <MemoryDetailPins
+                imageUrl={memory.imageUrl}
                 alt={memory.imageDescription || memory.title}
+                pins={memory.pins ?? []}
+                onAsk={(pin) => {
+                  setSelectedPin(pin);
+                  document
+                    .getElementById("shared-question")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
               />
             </div>
+            {memory.narration && (
+              <MemoryVoicePlayer narration={memory.narration} />
+            )}
             <div className="shared-caption">
               <span className="quote-mark">“</span>
               <p>{memory.caption}</p>
@@ -1089,6 +1208,8 @@ export function SharedMemory({ token }: { token: string }) {
                   try {
                     await api(`${base}/messages`, {
                       versionId: memory.versionId,
+                      publicationId: memory.publicationId,
+                      pinId: selectedPin?.id ?? null,
                       displayName: name,
                       text,
                     });
@@ -1101,6 +1222,19 @@ export function SharedMemory({ token }: { token: string }) {
                   }
                 }}
               >
+                <div id="shared-question" />
+                {selectedPin && (
+                  <div className="conn-quote">
+                    <blockquote>{selectedPin.sourceQuote}</blockquote>
+                    <button
+                      type="button"
+                      className="conn-link"
+                      onClick={() => setSelectedPin(null)}
+                    >
+                      Ask without this detail
+                    </button>
+                  </div>
+                )}
                 <Field label="Your name">
                   <input
                     required
