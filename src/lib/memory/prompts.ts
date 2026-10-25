@@ -15,15 +15,20 @@ export function validateSceneEvidence(story: string, plan: ScenePlan): void {
       );
   }
 }
+// Muse's Images endpoints accept a prompt, not chat roles. This shared directive
+// serves as the system-level visual default for generation and reference edits.
+export const imageGenerationInstruction = `Create a photorealistic candid photograph of one remembered moment, as if a real camera captured it as it happened. Use a landscape composition, natural available light appropriate to the described setting, believable camera perspective and depth of field, lifelike skin and fabric textures, realistic anatomy and proportions, and subtle everyday imperfections. The scene should feel unposed and lived-in, with restrained color and exposure rather than glossy advertising or a staged film still.
+Use photographic realism by default. Avoid comic-book art, cartoons, illustrations, watercolor, pencil drawing, painted surfaces, paper texture, 3D renders, plastic skin, exaggerated HDR, and fantasy lighting. Do not add text, lettering, captions, borders, or watermarks.
+This is an AI reconstruction of the storyteller's subjective memory, not evidence of a historical event. Depict only the approved details below. Respect the stated viewpoint, perceived scale, time and place; leave unknowns understated. Do not invent specific identities, landmarks, biographical events, or emotions. Facial likeness is unspecified unless supplied; do not imply an exact likeness of the real people.
+Show a single moment in one continuous scene. Depict each person only once. If the account describes a sequence, use its final described moment; do not duplicate a person to show earlier and later positions.`;
+
 export function buildImagePrompt(
   scene: ApprovedScene,
   instruction?: string,
 ): string {
   const p = scene.plan;
   const lines = [
-    "Create a warm illustrated memory in an expressive watercolor and colored-pencil storybook style, landscape composition, subtle paper texture. No text, lettering, captions, borders, or watermark.",
-    "This is the storyteller's subjective memory. Illustrate only their approved details; leave unknowns understated. Do not add specific identities, landmarks, biographical events, or inferred emotions.",
-    "Show a single moment in one continuous scene. Depict each person only once. If the account describes a sequence, use its final described moment; do not duplicate a person to show earlier and later positions.",
+    imageGenerationInstruction,
     p.setting && `Setting: ${p.setting.text}`,
     p.people.length && `People: ${p.people.map((x) => x.text).join("; ")}`,
     p.details.length &&
@@ -34,7 +39,8 @@ export function buildImagePrompt(
     scene.authorAdditions &&
       `Details personally added by storyteller: ${scene.authorAdditions}`,
     instruction &&
-      `Requested revision: ${instruction}. Preserve the existing scene, composition, people, colors, and important details except those explicitly changed.`,
+      `Requested revision: ${instruction}
+Preserve the reference scene, composition, people, colors, and important details except those explicitly changed. If the reference image is illustrated or stylized, reconstruct the same scene with photographic realism rather than preserving its art style.`,
   ];
   return lines.filter(Boolean).join("\n");
 }

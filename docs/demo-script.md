@@ -1,14 +1,14 @@
-# Solo demo: momenta
+# Solo demo: momentas
 
 Use an author browser and an incognito recipient browser. Label fictional samples and prepared outputs honestly.
 
 ## Three-minute narration
 
-**0:00-0:20 — Problem:** "A parent can tell you where they grew up. A friend can tell you about a day that changed them. But the details they carry in their head are hard to share. momenta gives them something to show you, and something you can ask about."
+**0:00-0:20 — Problem:** "A parent can tell you where they grew up. A friend can tell you about a day that changed them. But the details they carry in their head are hard to share. momentas gives them something to show you, and something you can ask about."
 
-**0:20-0:50 — Capture/review:** Show the bicycle sample and verbatim source quotes. "AI organizes what I said. I can correct it, add what mattered and approve what gets illustrated."
+**0:20-0:50 — Capture/review:** Show the bicycle sample and verbatim source quotes. "AI organizes what I said. I can correct it, add what mattered and approve what gets visualized."
 
-**0:50-1:30 — Visualize/refine:** Show a real saved initial illustration and request "Make the parking lot feel enormous, and put Dad farther behind me." Show both versions. Cut long generation waits transparently. "This is how big the world felt to me."
+**0:50-1:30 — Visualize/refine:** Show a real saved initial image and request "Make the parking lot feel enormous, and put Dad farther behind me." Show both versions. Cut long generation waits transparently. "This is how big the world felt to me."
 
 **1:30-2:15 — Connect:** Publish. In the recipient window ask "Were you scared when you realized I'd let go?" Refresh the author view and type a personal reply. Refresh the recipient. "The answer comes from the person who lived the memory. The picture opens the conversation."
 

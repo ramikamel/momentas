@@ -1,6 +1,6 @@
 import { chromium, expect } from '@playwright/test';
 import { mkdir, copyFile, writeFile } from 'node:fs/promises';
-const origin='https://momenta-hacktx.vercel.app';
+const origin='https://momentas-hacktx.vercel.app';
 await mkdir('output/demo/raw',{recursive:true});await mkdir('.data',{recursive:true});
 const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:1280,height:900},recordVideo:{dir:'output/demo/raw',size:{width:1280,height:900}}});
@@ -17,14 +17,14 @@ try{
  await expect(page.getByRole('heading',{name:'Does this feel like your memory?'})).toBeVisible({timeout:180000});
  console.log(JSON.stringify({stage:'production-scene',success:true}));await pause();
  await page.getByRole('checkbox').check();const generationStart=Date.now();
- await page.getByRole('button',{name:'Illustrate this memory'}).click();
- await expect(page.getByText('1 saved illustration',{exact:true})).toBeVisible({timeout:270000});await picture();
+ await page.getByRole('button',{name:'Visualize this memory'}).click();
+ await expect(page.getByText('1 saved image',{exact:true})).toBeVisible({timeout:270000});await picture();
  console.log(JSON.stringify({stage:'production-generation',success:true,seconds:(Date.now()-generationStart)/1000}));await pause();
  await page.getByLabel('What would bring it closer?').fill('Make the parking lot feel much bigger, and put Dad farther behind me. Keep each person shown only once.');await pause();
  const editStart=Date.now();await page.getByRole('button',{name:'Make this change'}).click();
- await expect(page.getByText('2 saved illustrations',{exact:true})).toBeVisible({timeout:270000});await picture();
+ await expect(page.getByText('2 saved images',{exact:true})).toBeVisible({timeout:270000});await picture();
  console.log(JSON.stringify({stage:'production-edit',success:true,seconds:(Date.now()-editStart)/1000}));await pause();
- await page.getByRole('button',{name:'Share this illustration'}).click();
+ await page.getByRole('button',{name:'Share this image'}).click();
  await page.getByLabel('A few words to go with it').fill('A fictional sample memory: I remember the parking lot feeling enormous. When I looked back, you had let go, and I was riding all by myself.');
  await page.getByRole('button',{name:'Publish this memory'}).click();
  const link=page.getByRole('textbox',{name:'Share link',exact:true});await expect(link).toBeVisible({timeout:30000});
@@ -49,5 +49,5 @@ try{
  console.log(JSON.stringify({stage:'production-share-and-human-exchange',success:true,shareUrl,browserErrors:failures}));
 }finally{
  const video=page.video();await context.close();await browser.close();
- if(video){await copyFile(await video.path(),'output/demo/momenta-walkthrough.webm');console.log(JSON.stringify({recording:'output/demo/momenta-walkthrough.webm',audio:false}));}
+ if(video){await copyFile(await video.path(),'output/demo/momentas-walkthrough.webm');console.log(JSON.stringify({recording:'output/demo/momentas-walkthrough.webm',audio:false}));}
 }

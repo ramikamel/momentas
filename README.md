@@ -1,12 +1,12 @@
-# momenta
+# momentas
 
 Let me show you how I remember it.
 
-Live app: https://momenta-hacktx.vercel.app
+Live app: https://momentas-hacktx.vercel.app
 
-Source: https://github.com/ramikamel/momenta
+Source: https://github.com/ramikamel/momentas
 
-Write a memory, review its source-linked scene details, create and refine a storybook illustration with Meta's Muse APIs, then share the approved version and exchange human questions and replies.
+Write a memory, review its source-linked scene details, create and refine a lifelike memory reconstruction with Meta's Muse APIs, then share the approved version and exchange human questions and replies.
 
 ## Local setup
 
@@ -28,12 +28,14 @@ Open http://localhost:3000. Without Supabase credentials, development persists i
 
 - Muse Spark (`muse-spark-1.3`) extracts a structured scene with verbatim source evidence. Unknown details remain unspecified. The storyteller edits and approves the result.
 - Muse Image (`muse-image-1.0`) generates one image and edits selected earlier images using reviewed details and a correction. Successful versions are retained.
+- The shared `imageGenerationInstruction` in `src/lib/memory/prompts.ts` applies to both generation and edits. It defaults to a candid, photorealistic camera image with natural light and lifelike textures, discourages comic/painted aesthetics, and converts stylized reference images to photographic realism during editing. The Images API accepts this direction in `prompt`, rather than a chat `system` role.
+- The UI identifies generated scenes as AI reconstructions, not original photographs. Unknown facial likenesses are not promised.
 - People ask and answer questions. Models do not impersonate relatives or answer autobiographical questions.
 - Voice input is deferred. Typed input supports the complete MVP.
 
 The first live smoke check observed extraction in 11.6 seconds, generation in 48.0 seconds, and editing in 17.2 seconds. This is one observation, not a latency promise. Its initial artwork repeated one person across time; the edit corrected that and prompts now explicitly request one moment and each person once. Author review remains essential.
 
-The landing illustration is real Muse output of a clearly fictional memory, copied from `tmp/meta-smoke/edited.webp` to `public/sample-memory.webp`. Final correction: "Make the parking lot feel much bigger, and put Dad farther behind the child. Preserve the red bicycle, the warm afternoon, and the storybook style." It was generated through Muse, not the built-in image tool.
+The landing image is real Muse output of a clearly fictional memory, copied from the photography smoke check in `tmp/meta-smoke/edited.webp` to `public/sample-memory.webp`. It uses the same generation and reference-edit path as the app. The correction preserves the red bicycle, warm afternoon and candid photographic realism. It was generated through Muse.
 
 ## Verification
 

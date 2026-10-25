@@ -53,7 +53,7 @@ export class MemoryService {
   private checkAi() {
     if (this.ai.configured === false)
       throw new AppError(
-        "AI illustration is not connected yet. Your memory is saved.",
+        "Image creation is not connected yet. Your memory is saved.",
         503,
         "META_NOT_CONFIGURED",
       );
@@ -210,7 +210,7 @@ export class MemoryService {
     );
     if (!version)
       throw new AppError(
-        "This illustration is not available.",
+        "This image is not available.",
         404,
         "NOT_FOUND",
       );
@@ -228,7 +228,7 @@ export class MemoryService {
       ),
       imageDescription:
         version.scene.plan.setting?.text ||
-        "An illustrated memory, shaped by its storyteller.",
+        "An AI memory reconstruction, shaped by its storyteller.",
       messages: await this.store.messages(m.id),
     };
   }
@@ -240,7 +240,7 @@ export class MemoryService {
       input = messageSchema.parse(raw);
     if (m.publishedVersionId !== input.versionId)
       throw new AppError(
-        "A newer illustration has been shared. Refresh to see it; your question is still here.",
+        "A newer image has been shared. Refresh to see it; your question is still here.",
         409,
         "VERSION_CHANGED",
       );

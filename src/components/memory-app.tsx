@@ -56,7 +56,7 @@ function Brand() {
       <span className="brand-mark">
         <BookOpen size={22} />
       </span>{" "}
-      momenta<span className="brand-period">.</span>
+      momentas<span className="brand-period">.</span>
     </Link>
   );
 }
@@ -174,7 +174,7 @@ function SampleArt() {
     <div className="sample-art sample-art-output">
       <img
         src="/sample-memory.webp"
-        alt="Fictional illustrated memory: a child rides a red bicycle across a spacious parking lot while their father cheers in the distance."
+        alt="Fictional AI memory reconstruction: a red bicycle in the foreground and a father cheering across an enormous parking lot, seen from the rider’s viewpoint."
       />
       <span className="sample-label">Fictional sample · Muse Image</span>
     </div>
@@ -225,7 +225,7 @@ export function Landing() {
             <p>
               You remember more than what happened.
               <br className="desktop-break" /> You remember how it felt. Turn
-              your memory into an illustration, then share it with someone who
+              your memory into a lifelike scene, then share it with someone who
               matters.
             </p>
             <Link className="button primary" href="#begin">
@@ -259,7 +259,7 @@ export function Landing() {
           <div>
             <span className="section-number">02</span>
             <h3>Make it yours.</h3>
-            <p>Review the scene and shape an illustration that feels right.</p>
+            <p>Review the details and recreate a moment that feels real.</p>
           </div>
           <div>
             <span className="section-number">03</span>
@@ -394,9 +394,9 @@ function MessageList({
               <span>
                 {m.role === "storyteller" ? "Storyteller" : "Recipient"}
                 {versions
-                  ? ` · illustration ${versions.findIndex((v) => v.id === m.versionId) + 1}`
+                  ? ` · image ${versions.findIndex((v) => v.id === m.versionId) + 1}`
                   : currentVersionId && m.versionId !== currentVersionId
-                    ? " · Earlier illustration"
+                    ? " · Earlier image"
                     : ""}
               </span>
             </div>
@@ -511,7 +511,7 @@ export function Workspace({ id }: { id: string }) {
   }
   async function render() {
     if (!draft.scenePlan || !approved) return;
-    await run("Illustrating your memory", async () => {
+    await run("Reconstructing your memory", async () => {
       await save();
       const v = await api<ImageVersionView>(`${base}/versions`, {
         requestId: crypto.randomUUID(),
@@ -552,7 +552,7 @@ export function Workspace({ id }: { id: string }) {
             {[
               "Tell the memory",
               "Review the scene",
-              "Shape the illustration",
+              "Shape the image",
               "Share & connect",
             ].map((s, i) => (
               <button
@@ -615,7 +615,7 @@ export function Workspace({ id }: { id: string }) {
                 <p>
                   {error
                     ? "Open it in the browser where it was created, or use the shared link to view the published memory."
-                    : "Finding your saved words and illustrations."}
+                    : "Finding your saved words and images."}
                 </p>
               </div>
             ) : stage === 0 ? (
@@ -705,11 +705,11 @@ export function Workspace({ id }: { id: string }) {
                     disabled={!approved}
                     onClick={render}
                   >
-                    Illustrate this memory <Sparkles size={17} />
+                    Visualize this memory <Sparkles size={17} />
                   </button>
                   <p className="form-note">
-                    An illustration of your perspective, not a photograph of the
-                    past.
+                    A realistic AI reconstruction of your perspective, not an
+                    original photograph.
                     <br />
                     Image creation may take a few minutes.
                   </p>
@@ -725,10 +725,10 @@ export function Workspace({ id }: { id: string }) {
                   <div className="image-frame">
                     <img
                       src={version.imageUrl}
-                      alt={`Illustration of ${draft.title}, version ${memory.versions.findIndex((v) => v.id === selected) + 1}`}
+                      alt={`AI reconstruction of ${draft.title}, version ${memory.versions.findIndex((v) => v.id === selected) + 1}`}
                     />
                     <span className="image-label">
-                      ILLUSTRATION{" "}
+                      AI RECONSTRUCTION{" "}
                       {String(
                         memory.versions.findIndex((v) => v.id === selected) + 1,
                       ).padStart(2, "0")}
@@ -739,8 +739,8 @@ export function Workspace({ id }: { id: string }) {
                   <span>
                     {memory.versions.length} saved{" "}
                     {memory.versions.length === 1
-                      ? "illustration"
-                      : "illustrations"}
+                      ? "image"
+                      : "images"}
                   </span>
                   <div>
                     {memory.versions.map((v, i) => (
@@ -767,12 +767,12 @@ export function Workspace({ id }: { id: string }) {
                   {(!draft.scenePlan || !approved) && (
                     <p className="link-notice">
                       Your scene needs review. Review and approve its details
-                      before creating another illustration.
+                      before creating another image.
                     </p>
                   )}
                   <Field
                     label="What would bring it closer?"
-                    hint="Your current illustration is always saved. Each successful correction becomes a new version."
+                    hint="Your current image is always saved. Each successful correction becomes a new version."
                   >
                     <textarea
                       rows={3}
@@ -798,7 +798,7 @@ export function Workspace({ id }: { id: string }) {
                         !instruction.trim() || !draft.scenePlan || !approved
                       }
                       onClick={() => {
-                        void run("Refining your illustration", async () => {
+                        void run("Refining your image", async () => {
                           await save();
                           const v = await api<ImageVersionView>(
                             `${base}/versions`,
@@ -829,7 +829,7 @@ export function Workspace({ id }: { id: string }) {
                     className="button primary"
                     onClick={() => setStage(3)}
                   >
-                    Share this illustration <ArrowRight size={17} />
+                    Share this image <ArrowRight size={17} />
                   </button>
                 </div>
               </>
@@ -852,7 +852,7 @@ export function Workspace({ id }: { id: string }) {
                         </span>
                         <h2>{draft.title}</h2>
                         <p>
-                          An illustrated memory, shaped by {draft.authorName}.
+                          An AI memory reconstruction, shaped by {draft.authorName}.
                         </p>
                       </div>
                     </div>
@@ -869,7 +869,7 @@ export function Workspace({ id }: { id: string }) {
                     </Field>
                     <p className="link-notice">
                       Anyone with this link can view this memory and leave a
-                      question. Your draft and other illustrations stay private.
+                      question. Your draft and other images stay private.
                     </p>
                     <button
                       className="button primary wide"
@@ -1037,7 +1037,10 @@ export function SharedMemory({ token }: { token: string }) {
                 A MEMORY FOR {memory.recipientName.toUpperCase()}
               </div>
               <h1>{memory.title}</h1>
-              <p>An illustrated memory, shaped by {memory.authorName}.</p>
+              <p>
+                AI reconstruction · Shaped by {memory.authorName}, not an
+                original photograph.
+              </p>
             </div>
             <div className="shared-image">
               <img

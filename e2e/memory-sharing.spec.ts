@@ -18,12 +18,12 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
     page.getByRole("heading", { name: "Does this feel like your memory?" }),
   ).toBeVisible();
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Illustrate this memory" }).click();
+  await page.getByRole("button", { name: "Visualize this memory" }).click();
   await expect(
     page.getByRole("heading", { name: "A little closer to how it felt." }),
   ).toBeVisible();
   await expect(
-    page.getByText("1 saved illustration", { exact: true }),
+    page.getByText("1 saved image", { exact: true }),
   ).toBeVisible();
   await page
     .getByLabel("What would bring it closer?")
@@ -36,16 +36,16 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
     "[test-fail] Put Dad farther behind me.",
   );
   await expect(
-    page.getByText("1 saved illustration", { exact: true }),
+    page.getByText("1 saved image", { exact: true }),
   ).toBeVisible();
   await page
     .getByLabel("What would bring it closer?")
     .fill("Put Dad farther behind me.");
   await page.getByRole("button", { name: "Make this change" }).click();
   await expect(
-    page.getByText("2 saved illustrations", { exact: true }),
+    page.getByText("2 saved images", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Share this illustration" }).click();
+  await page.getByRole("button", { name: "Share this image" }).click();
   await page
     .getByLabel("A few words to go with it")
     .fill("This is how I remember that afternoon. What do you remember?");

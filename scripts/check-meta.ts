@@ -49,7 +49,7 @@ async function main() {
   const edited = await ai.editImage(
     image,
     scene,
-    "Make the parking lot feel much bigger, and put Dad farther behind the child. Preserve the red bicycle, the warm afternoon, and the storybook style.",
+    "Make the parking lot feel much bigger, and put Dad farther behind the child. Preserve the red bicycle, the warm afternoon, and the candid photographic realism.",
   );
   await writeFile(
     resolve(folder, `edited.${edited.mimeType.split("/")[1]}`),
