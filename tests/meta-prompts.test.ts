@@ -40,6 +40,8 @@ it.each(["generate", "edit"] as const)("sends the photography default to Muse fo
   expect(request.path).toBe(`/v1/images/${operation === "generate" ? "generations" : "edits"}`);
   expect(request.body.prompt).toMatch(/photorealistic candid photograph/i);
   expect(request.body.prompt).toMatch(/natural available light/i);
+  expect(request.body.prompt).toMatch(/whole frame in clear focus/i);
+  expect(request.body.prompt).toMatch(/do not use a shallow depth of field/i);
   expect(request.body.prompt).toMatch(/ordinary physics/i);
   expect(request.body.prompt).toMatch(/nothing floats/i);
   expect(request.body.prompt).toContain("An empty parking lot");
