@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Brand, Header } from "./site-header";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -61,32 +62,6 @@ async function api<T>(
       { status: r.status, code: data.code },
     );
   return data;
-}
-function Brand() {
-  return (
-    <Link className="brand" href="/">
-      <span className="brand-mark">
-        <BookOpen size={22} />
-      </span>{" "}
-      momentas<span className="brand-period">.</span>
-    </Link>
-  );
-}
-export function Header() {
-  return (
-    <header className="header">
-      <Brand />
-      <span className="header-note">
-        A little closer to the way you remember.
-      </span>
-      <Link className="quiet-link saved-link" href="/library">
-        Saved pictures
-      </Link>
-      <Link className="quiet-link create-link" href="/#choose">
-        Create a memory <ArrowUpRight size={15} />
-      </Link>
-    </header>
-  );
 }
 function Busy({ label }: { label: string }) {
   const [seconds, setSeconds] = useState(0);

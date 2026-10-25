@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { SavedMemory } from "@/lib/memory/types";
-import { Header } from "./memory-app";
+import { Header } from "./site-header";
 export function SavedPictures() {
   const [data, setData] = useState<{
       memories: SavedMemory[];

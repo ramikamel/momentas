@@ -1,30 +1,30 @@
 .photo-start {
   padding: 2.4rem;
-  border: 1px solid #dfd9c9;
-  background: #f8f2e7;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
   border-radius: 24px;
   margin: 1.5rem 0;
 }
 .photo-start h2 {
-  font-family: Georgia, serif;
+  font-family: var(--font-story);
   font-size: 2.3rem;
   margin: 0.7rem 0;
 }
 .photo-start p {
   max-width: 35rem;
-  color: #5b6258;
+  color: var(--muted);
 }
 .photo-start small {
   display: block;
   margin-top: 1rem;
-  color: #6a7167;
+  color: var(--muted);
 }
 .photo-workspace {
   max-width: 1480px;
   margin: auto;
   padding: 2rem 4vw 4rem;
-  background: #f8f6ef;
-  color: #28382f;
+  background: var(--paper);
+  color: var(--ink);
 }
 .photo-heading {
   padding: 1rem 0 2rem;
@@ -32,17 +32,15 @@
 .photo-heading a {
   display: block;
   margin-bottom: 2rem;
-  color: #5b675c;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 .photo-heading h1 {
-  font:
-    clamp(2.3rem, 4vw, 4rem) / 1.1 Georgia,
-    serif;
+  font: clamp(2.3rem, 4vw, 4rem) / 1.1 var(--font-story);
   margin: 0.8rem 0;
 }
 .photo-heading p {
-  color: #697165;
+  color: var(--muted);
 }
 .photo-layout {
   display: grid;
@@ -94,18 +92,18 @@
   border-radius: 50%;
   width: 30px;
   height: 30px;
-  background: #fff6d8;
+  background: var(--surface);
   border: 2px solid white;
-  color: #394b37;
+  color: var(--ink);
   box-shadow: 0 1px 8px #0003;
   z-index: 2;
 }
 .photo-dot.selected {
-  background: #d9ac64;
+  background: var(--surface-blue);
 }
 .photo-caption {
   font-size: 0.8rem;
-  color: #717769;
+  color: var(--muted);
   margin: 1rem 0.3rem;
 }
 .photo-objects {
@@ -117,11 +115,11 @@
 .photo-story nav button,
 .photo-prompts button,
 .photo-find button {
-  border: 1px solid #d5d8c9;
-  border-radius: 20px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
   padding: 0.5rem 0.9rem;
-  background: #fffdf6;
-  color: #384d3d;
+  background: var(--surface);
+  color: var(--ink);
 }
 .photo-find {
   display: flex;
@@ -132,15 +130,15 @@
   width: 100%;
   min-width: 0;
   border: 0;
-  border-bottom: 1px solid #c8ccbd;
+  border-bottom: 1px solid var(--field-border);
   background: transparent;
   padding: 0.7rem;
   font-size: 0.85rem;
 }
 .photo-story {
-  background: #fffdf7;
-  border: 1px solid #e8e5d8;
-  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
   padding: 1.6rem;
 }
 .photo-story nav {
@@ -150,36 +148,36 @@
   margin-bottom: 1.8rem;
 }
 .photo-story nav button[aria-pressed="true"] {
-  background: #e4eacf;
-  border-color: #b8c39d;
+  background: var(--surface-blue);
+  border-color: var(--field-border);
 }
 .photo-story h2 {
-  font:
-    1.8rem/1.2 Georgia,
-    serif;
+  font: 1.8rem/1.2 var(--font-story);
   margin: 0.8rem 0 1.3rem;
 }
 .photo-composer label {
   display: block;
   font-size: 0.8rem;
   margin: 1rem 0 0.6rem;
-  color: #626e5e;
+  color: var(--ink);
 }
 .photo-composer textarea {
   width: 100%;
   box-sizing: border-box;
   resize: vertical;
-  border: 1px solid #d9dccd;
+  border: 1px solid var(--field-border);
   border-radius: 12px;
   padding: 1rem;
-  background: #fffefb;
-  font: 1rem/1.6 inherit;
+  background: var(--field-bg);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 .photo-composer > .button {
   margin-top: 1rem;
 }
 .photo-prompts {
-  border-top: 1px solid #e6e6d9;
+  border-top: 1px solid var(--line);
   padding-top: 1.2rem;
   margin-top: 1.5rem;
   font-size: 0.9rem;
@@ -193,14 +191,14 @@
 }
 .photo-reference {
   margin-top: 2.5rem;
-  border-top: 1px solid #dfe1d3;
+  border-top: 1px solid var(--line);
   padding: 1.5rem 0;
 }
 .photo-reference summary {
   cursor: pointer;
 }
 .photo-reference summary span {
-  color: #79806e;
+  color: var(--muted);
   font-size: 0.8rem;
   margin-left: 1rem;
 }
@@ -211,7 +209,7 @@
 .photo-workspace button:focus-visible,
 .photo-workspace input:focus-visible,
 .photo-workspace textarea:focus-visible {
-  outline: 3px solid #b48c4c;
+  outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
 @media (max-width: 850px) {

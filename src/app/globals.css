@@ -7,6 +7,19 @@
   --accent: #365c7c;
   --cream: #e9ede8;
   --green: #566c60;
+  --surface: #ffffff;
+  --surface-soft: #eef2ee;
+  --surface-blue: #e9eef0;
+  --field-bg: #fbfcf9;
+  --field-border: #bac8ca;
+  --accent-hover: #284962;
+  --success: #365e48;
+  --success-bg: #e3ece4;
+  --error: #943b2a;
+  --error-bg: #fbefe9;
+  --mask-fill: #eecb6b38;
+  --mask-stroke: #fff2b5;
+  --mask-idle-stroke: #fff2b570;
   --font-body: "Avenir Next", "Segoe UI", sans-serif;
   --font-story:
     "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
@@ -144,7 +157,7 @@ em {
   margin: 25px 0;
 }
 .hero-copy > p {
-  color: #767b72;
+  color: var(--muted);
   line-height: 1.8;
   font-size: 15px;
   max-width: 440px;
@@ -174,7 +187,7 @@ em {
   box-shadow: 0 4px 10px #263e5212;
 }
 .primary:hover:not(:disabled) {
-  background: #284962;
+  background: var(--accent-hover);
 }
 .secondary {
   background: var(--ink);
@@ -204,13 +217,13 @@ em {
   gap: 8px;
   font-size: 10px;
   letter-spacing: 0.2px;
-  color: #919184;
+  color: var(--muted);
   margin-top: 27px;
 }
 .hero-art {
   position: relative;
   transform: rotate(1.5deg);
-  background: #fffdf7;
+  background: var(--surface);
   padding: 13px 13px 0;
   box-shadow: 0 8px 30px #4b4d3812;
   border: 1px solid #e4dfd2;
@@ -372,7 +385,7 @@ em {
 .hand-note {
   display: block;
   font-family: var(--font-story);
-  color: #a59a7f;
+  color: var(--muted);
   font-size: 23px;
   font-style: italic;
   transform: rotate(-7deg);
@@ -381,7 +394,7 @@ em {
 }
 .paper {
   border: 1px solid var(--line);
-  background: #fdfcf7;
+  background: var(--surface);
   border-radius: 7px;
 }
 .form-card,
@@ -397,15 +410,15 @@ em {
   font-weight: 600;
   font-size: 11px;
   margin-bottom: 8px;
-  color: #555c51;
+  color: var(--ink);
 }
 .field input,
 .field textarea,
 .sourced-detail textarea,
 .reply-form textarea {
   width: 100%;
-  border: 1px solid #dedfd5;
-  background: #fffef9;
+  border: 1px solid var(--field-border);
+  background: var(--surface);
   border-radius: 4px;
   color: var(--ink);
   padding: 12px 13px;
@@ -418,7 +431,7 @@ em {
 }
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #a5a69b;
+  color: var(--muted);
 }
 .field small {
   font-size: 10px;
@@ -436,7 +449,7 @@ em {
   font-size: 10px;
   line-height: 1.8;
   text-align: center;
-  color: #929385;
+  color: var(--muted);
   margin-top: 15px;
 }
 .error {
@@ -450,7 +463,7 @@ em {
 }
 .busy {
   padding: 13px 17px;
-  background: #eeeee2;
+  background: var(--surface-soft);
   border: 1px solid var(--line);
   border-radius: 5px;
   display: flex;
@@ -541,7 +554,7 @@ footer > span {
   border-radius: 4px;
 }
 .steps button > span {
-  border: 1px solid #d5d8ca;
+  border: 1px solid var(--line);
   border-radius: 100%;
   width: 25px;
   height: 25px;
@@ -551,7 +564,7 @@ footer > span {
   font-size: 9px;
 }
 .steps .active {
-  background: #edece0;
+  background: var(--surface-blue);
   color: var(--ink);
   font-weight: 600;
 }
@@ -562,7 +575,7 @@ footer > span {
 }
 .sidebar-note {
   margin-top: 55px;
-  color: #8c8e7c;
+  color: var(--muted);
   font-family: var(--font-story);
   font-size: 16px;
   font-style: italic;
@@ -575,7 +588,7 @@ footer > span {
 .browser-note {
   display: block;
   font-size: 9px;
-  color: #96998c;
+  color: var(--muted);
   line-height: 1.7;
   margin-top: 45px;
 }
@@ -591,8 +604,8 @@ footer > span {
 }
 .private-badge {
   font-size: 9px;
-  color: #7e866d;
-  background: #ededdf;
+  color: var(--muted);
+  background: var(--surface-soft);
   padding: 5px 9px;
   border-radius: 20px;
 }
@@ -646,18 +659,18 @@ h4 {
 }
 .sourced-detail blockquote {
   font-family: var(--font-story);
-  color: #92927f;
+  color: var(--muted);
   font-size: 11px;
   font-style: italic;
   margin: 5px 0 0 10px;
   padding-left: 10px;
-  border-left: 1px solid #d9d6c3;
+  border-left: 1px solid var(--line);
 }
 .small {
   font-size: 11px;
 }
 .question-prompts {
-  background: #f0efe4;
+  background: var(--surface-soft);
   border-radius: 5px;
   padding: 17px;
   margin-bottom: 23px;
@@ -672,7 +685,7 @@ h4 {
   font-family: var(--font-story);
   font-size: 14px;
   margin: 5px 0;
-  color: #737c68;
+  color: var(--muted);
 }
 .approval {
   display: flex;
@@ -689,10 +702,10 @@ h4 {
 }
 .image-frame {
   position: relative;
-  border: 1px solid #dfdbcd;
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px;
-  background: #fffdf7;
+  background: var(--surface);
   overflow: hidden;
 }
 .image-frame > img {
@@ -700,13 +713,13 @@ h4 {
   object-fit: contain;
   width: 100%;
   max-height: 630px;
-  background: #efeee3;
+  background: var(--surface-soft);
 }
 .image-label {
   position: absolute;
   bottom: 25px;
   left: 25px;
-  background: #fffdf5df;
+  background: #ffffffdf;
   border-radius: 3px;
   padding: 5px 10px;
   font-size: 8px;
@@ -730,7 +743,7 @@ h4 {
 }
 .version {
   border: 1px solid var(--line);
-  background: #fffdf7;
+  background: var(--surface);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -776,7 +789,7 @@ h4 {
 .publish-preview {
   border: 1px solid var(--line);
   padding: 9px;
-  background: #fffdf7;
+  background: var(--surface);
   border-radius: 5px;
   align-self: start;
   transform: rotate(-1deg);
@@ -872,10 +885,10 @@ h4 {
 .conversation-empty {
   text-align: center;
   padding: 45px 20px;
-  border: 1px dashed #d8d9ca;
+  border: 1px dashed var(--line);
   border-radius: 5px;
   margin-top: 25px;
-  color: #8f957f;
+  color: var(--muted);
 }
 .conversation-empty svg {
   margin: auto auto 10px;
@@ -883,7 +896,7 @@ h4 {
 .conversation-empty p {
   font-family: var(--font-story);
   font-size: 20px;
-  color: #717a62;
+  color: var(--muted);
 }
 .conversation-empty span {
   font-size: 11px;
@@ -906,8 +919,8 @@ h4 {
   width: 28px;
   height: 28px;
   border-radius: 100%;
-  background: #e7e7d8;
-  color: #798064;
+  background: var(--surface-blue);
+  color: var(--muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -919,8 +932,8 @@ h4 {
   white-space: pre-wrap;
 }
 .reply {
-  border-left: 2px solid #b2b69a;
-  background: #efefe4;
+  border-left: 2px solid var(--field-border);
+  background: var(--surface-soft);
   margin: 15px 0 0 15px;
   padding: 14px 17px;
   border-radius: 0 4px 4px 0;
@@ -992,7 +1005,7 @@ h4 {
 }
 .shared-image {
   padding: 12px;
-  background: #fffdf7;
+  background: var(--surface);
   box-shadow: 0 5px 25px #41452e0d;
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -1013,7 +1026,7 @@ h4 {
   font-family: var(--font-story);
   font-size: 65px;
   line-height: 0.8;
-  color: #c2b397;
+  color: var(--muted);
 }
 .shared-caption p {
   font-family: var(--font-story);
@@ -1031,7 +1044,7 @@ h4 {
   justify-content: center;
   position: relative;
   margin: 55px 0;
-  color: #b2aa91;
+  color: var(--muted);
 }
 .shared-divider:before,
 .shared-divider:after {
@@ -1059,7 +1072,7 @@ h4 {
 }
 .question-starters button {
   font-size: 9px;
-  color: #858a76;
+  color: var(--muted);
   border: 1px solid var(--line);
   background: transparent;
   padding: 6px 10px;
@@ -1079,7 +1092,7 @@ h4 {
 .shared-end {
   text-align: center;
   margin: 80px auto;
-  color: #999b86;
+  color: var(--muted);
 }
 .shared-end svg {
   margin: 0 auto 15px;
@@ -1468,8 +1481,8 @@ h4 {
 .sample-art-output .sample-label {
   padding: 5px 8px;
   border-radius: 3px;
-  background: #fffaf0e8;
-  color: #68634f;
+  background: #ffffffe8;
+  color: var(--ink);
   left: 13px;
   bottom: 12px;
   font-size: 8px;
@@ -1539,7 +1552,7 @@ h4 {
   border-radius: 8px;
   overflow: hidden;
   display: block;
-  background: #fffef9;
+  background: var(--surface);
 }
 .saved-picture img {
   width: 100%;
@@ -1558,13 +1571,13 @@ h4 {
 }
 .saved-picture:hover,
 .saved-picture:focus-visible {
-  border-color: #ad5d43;
+  border-color: var(--accent);
 }
 .saved-empty,
 .saved-draft-note {
   padding: 30px;
   border: 1px dashed var(--line);
-  background: #faf8f0;
+  background: var(--surface-soft);
   line-height: 1.7;
 }
 @media (max-width: 700px) {
@@ -1760,5 +1773,5 @@ h4 {
   background: var(--accent);
 }
 .published-sharing .conn-button:not(.secondary):hover:not(:disabled) {
-  background: #284962;
+  background: var(--accent-hover);
 }

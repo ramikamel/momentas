@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 test.use({
   launchOptions: {
     args: [
@@ -96,6 +97,28 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   expect(neutral).not.toHaveProperty("story");
   expect(neutral).not.toHaveProperty("imageUrl");
   await recipient.goto(invite);
+  await expect(
+    recipient.getByLabel("Your name", { exact: true }),
+  ).toBeVisible();
+  await mkdir("output/style-consistency", { recursive: true });
+  await recipient.setViewportSize({ width: 1440, height: 1000 });
+  await recipient.screenshot({
+    path: "output/style-consistency/invitation-desktop.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  await recipient.setViewportSize({ width: 390, height: 844 });
+  await recipient.screenshot({
+    path: "output/style-consistency/invitation-mobile.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  expect(
+    await recipient.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await recipient.setViewportSize({ width: 1440, height: 1000 });
   await recipient.getByLabel("Your name", { exact: true }).fill("Dad");
   await recipient
     .getByRole("button", { name: "Begin my perspective", exact: false })
@@ -157,6 +180,23 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   await expect(
     recipient.getByRole("tab", { name: "Alex remembers" }),
   ).toBeVisible();
+  await recipient.screenshot({
+    path: "output/style-consistency/comparison-desktop.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  await recipient.setViewportSize({ width: 390, height: 844 });
+  await recipient.screenshot({
+    path: "output/style-consistency/comparison-mobile.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  expect(
+    await recipient.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await recipient.setViewportSize({ width: 1440, height: 1000 });
   await expect(recipient.locator("audio")).toHaveCount(1);
   await recipient.getByRole("button", { name: /Explore detail 1/ }).click();
   await recipient

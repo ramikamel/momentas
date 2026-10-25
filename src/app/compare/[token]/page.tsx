@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Header } from "@/components/site-header";
 import { PerspectiveComparison } from "@/components/perspective-comparison";
 export default async function Page({
   params,
@@ -8,13 +8,7 @@ export default async function Page({
   const { token } = await params;
   return (
     <>
-      <header className="conn-header">
-        <Link href="/">momentas.</Link>
-        <span>A little closer to the way you remember.</span>
-        <Link className="conn-library-link" href="/library">
-          Saved pictures
-        </Link>
-      </header>
+      <Header />
       <PerspectiveComparison token={token} />
     </>
   );
