@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   pixelPoint,
   outlineFromText,
+  conceptPhrases,
   SegmentationService,
   segmentImage,
 } from "@/lib/server/segmentation";
@@ -11,6 +12,19 @@ import { hashToken } from "@/lib/server/access";
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+it("keeps short visible noun phrases and drops commands", () => {
+  expect(
+    conceptPhrases({
+      concepts: [
+        "Helmet",
+        "young boy",
+        "segment the person",
+        "helmet",
+        "a very long description of the whole child",
+      ],
+    }),
+  ).toEqual(["helmet", "young boy"]);
 });
 it("maps scaled edge clicks to in-bounds media pixels", () => {
   expect(pixelPoint(0.5, 0.25, 768, 512)).toEqual({ x: 384, y: 128 });

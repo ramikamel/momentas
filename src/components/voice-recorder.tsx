@@ -5,25 +5,28 @@ import type { NarrationView } from "@/lib/memory/connections";
 import "./connections.css";
 export function VoiceRecorder({
   memoryId,
+  ensureMemory,
   onUse,
-  onSelect,
 }: {
-  memoryId: string;
+  memoryId?: string;
+  ensureMemory?: () => Promise<string>;
   onUse: (v: { story: string; narrationId: string }) => void;
-  onSelect?: (id: string) => void;
 }) {
   const [recording, setRecording] = useState(false),
     [elapsed, setElapsed] = useState(0),
     [wav, setWav] = useState<Uint8Array | null>(null),
     [url, setUrl] = useState(""),
-    [saved, setSaved] = useState<NarrationView | null>(null),
-    [text, setText] = useState(""),
     [busy, setBusy] = useState(false),
+    [status, setStatus] = useState(""),
     [error, setError] = useState("");
   const recorder = useRef<MediaRecorder | null>(null),
     stream = useRef<MediaStream | null>(null),
     timer = useRef<ReturnType<typeof setInterval> | null>(null),
-    alive = useRef(true);
+    alive = useRef(true),
+    memory = useRef(memoryId || "");
+  useEffect(() => {
+    memory.current = memoryId || memory.current;
+  }, [memoryId]);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -50,8 +53,63 @@ export function VoiceRecorder({
     stream.current?.getTracks().forEach((t) => t.stop());
     setRecording(false);
   }
+  async function transcribe(bytes: Uint8Array) {
+    setBusy(true);
+    setError("");
+    setStatus("Writing down what you said…");
+    try {
+      let id = memory.current;
+      if (!id) {
+        if (!ensureMemory) throw new Error("Save the memory before recording.");
+        id = await ensureMemory();
+        memory.current = id;
+      }
+      const body = new FormData();
+      body.set(
+        "audio",
+        new Blob([new Uint8Array(bytes)], { type: "audio/wav" }),
+        "memory.wav",
+      );
+      const uploaded = await fetch(`/api/memories/${id}/narrations`, {
+        method: "POST",
+        body,
+      });
+      const narration = await uploaded.json();
+      if (!uploaded.ok) throw new Error(narration.error);
+      const r = await fetch(
+        `/api/memories/${id}/narrations/${(narration as NarrationView).id}/transcribe`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId: crypto.randomUUID() }),
+        },
+      );
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      const story = String(data.transcript ?? "").trim();
+      if (!story)
+        throw new Error(
+          "No words were heard. Record again, or type the memory below.",
+        );
+      if (alive.current) {
+        onUse({ story, narrationId: data.id });
+        setStatus("Your words are in the memory below. You can edit them there.");
+      }
+    } catch (e) {
+      if (alive.current)
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Could not transcribe. Your words are still here.",
+        );
+      if (alive.current) setStatus("");
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  }
   async function start() {
     setError("");
+    setStatus("");
     if (
       !navigator.mediaDevices?.getUserMedia ||
       typeof MediaRecorder === "undefined"
@@ -88,18 +146,16 @@ export function VoiceRecorder({
           const normalized = await normalizeRecording(
             new Blob(chunks, { type: r.mimeType }),
           );
-          if (alive.current) {
-            setWav(normalized);
-            setSaved(null);
-            setText("");
-          }
+          if (!alive.current) return;
+          setWav(normalized);
+          await transcribe(normalized);
         } catch {
-          if (alive.current)
+          if (alive.current) {
+            setBusy(false);
             setError(
               "We could not read that recording. Record at least one second, or type your memory.",
             );
-        } finally {
-          if (alive.current) setBusy(false);
+          }
         }
       };
       r.start();
@@ -118,58 +174,14 @@ export function VoiceRecorder({
       );
     }
   }
-  async function transcribe() {
-    if (!wav) return;
-    setBusy(true);
-    setError("");
-    try {
-      let n = saved;
-      if (!n) {
-        const body = new FormData();
-        body.set(
-          "audio",
-          new Blob([new Uint8Array(wav)], { type: "audio/wav" }),
-          "memory.wav",
-        );
-        const r = await fetch(`/api/memories/${memoryId}/narrations`, {
-          method: "POST",
-          body,
-        });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error);
-        n = data as NarrationView;
-        setSaved(n);
-      }
-      const r = await fetch(
-        `/api/memories/${memoryId}/narrations/${n.id}/transcribe`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ requestId: crypto.randomUUID() }),
-        },
-      );
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error);
-      setSaved(data);
-      setText(data.transcript ?? "");
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Could not transcribe. Your words are still here.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <section className="conn-recorder">
       <div>
         <span className="conn-eyebrow">A memory sounds like you</span>
         <h3>Tell it in your own voice.</h3>
         <p className="conn-muted">
-          Record up to a minute. Review the transcript before using it. Your
-          words below stay yours to edit.
+          Record up to a minute. When you stop, your words go straight into the
+          memory below.
         </p>
       </div>
       <div className="conn-actions">
@@ -179,60 +191,28 @@ export function VoiceRecorder({
           disabled={busy}
           onClick={recording ? stop : start}
         >
-          {recording ? `Stop recording · ${elapsed}s` : "Record my memory"}
+          {recording
+            ? `Stop recording · ${elapsed}s`
+            : wav
+              ? "Record again"
+              : "Record my memory"}
         </button>
-        {wav && !recording && (
+        {wav && !recording && error && (
           <button
             type="button"
             className="conn-button secondary"
             disabled={busy}
-            onClick={transcribe}
+            onClick={() => void transcribe(wav)}
           >
-            {busy
-              ? "Preparing your words…"
-              : saved?.transcript
-                ? "Transcribe again"
-                : "Transcribe recording"}
+            {busy ? "Writing down what you said…" : "Try again"}
           </button>
         )}
       </div>
       {url && <audio src={url} controls aria-label="Preview your recording" />}
-      {saved && (
-        <button
-          type="button"
-          className="conn-link"
-          disabled={busy}
-          onClick={() => onSelect?.(saved.id)}
-        >
-          Use this recording with my written memory
-        </button>
-      )}
-      {text && (
-        <>
-          <label className="conn-field">
-            Review your transcript
-            <textarea
-              rows={4}
-              maxLength={6000}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            className="conn-button"
-            disabled={!text.trim() || !saved}
-            onClick={() =>
-              saved && onUse({ story: text, narrationId: saved.id })
-            }
-          >
-            Use transcript
-          </button>
-          <p className="conn-small">
-            This replaces the written account and asks you to review the scene
-            again.
-          </p>
-        </>
+      {status && (
+        <p className="conn-small" role="status">
+          {status}
+        </p>
       )}
       {wav && (
         <button
@@ -241,9 +221,8 @@ export function VoiceRecorder({
           disabled={busy}
           onClick={() => {
             setWav(null);
-            setSaved(null);
-            setText("");
             setError("");
+            setStatus("");
           }}
         >
           Discard this recording

@@ -27,6 +27,11 @@ import type {
   SourcedDetail,
 } from "@/lib/memory/types";
 import { VoiceRecorder } from "./voice-recorder";
+import {
+  ReferencePhotos,
+  uploadPendingReferences,
+  type PendingReference,
+} from "./reference-photos";
 import { MemoryVoicePlayer } from "./memory-voice-player";
 import { DetailPinEditor, MemoryDetailPins } from "./memory-detail-pins";
 import { PerspectiveControls } from "./perspective-controls";
@@ -197,10 +202,14 @@ export function Landing() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [createdId, setCreatedId] = useState(""),
-    [busyMessage, setBusyMessage] = useState("");
+    [busyMessage, setBusyMessage] = useState(""),
+    [references, setReferences] = useState<PendingReference[]>([]);
   const generationAttempt = useRef<{ signature: string; id: string } | null>(
-    null,
-  );
+      null,
+    ),
+    draftRef = useRef(draft),
+    idRef = useRef("");
+  draftRef.current = draft;
   function sample() {
     setDraft({
       title: "The day you let go",
@@ -221,13 +230,16 @@ export function Landing() {
     setError("");
     setBusyMessage("Saving your memory");
     try {
-      let id = createdId;
+      let id = idRef.current || createdId;
       if (!id) {
         const r = await api<{ id: string }>("/api/memories", draft);
         id = r.id;
+        idRef.current = id;
         setCreatedId(id);
       } else if (generationAttempt.current?.signature !== JSON.stringify(draft))
         await api(`/api/memories/${id}`, draft, "PATCH");
+      const savedReferences = await uploadPendingReferences(id, references);
+      setReferences(savedReferences);
       if (mode === "details") {
         setBusyMessage("Finding the details in your memory");
         await api(`/api/memories/${id}/scene`, { story: draft.story });
@@ -250,30 +262,15 @@ export function Landing() {
       setBusy(false);
     }
   }
-  async function startVoice() {
-    if (
-      !draft.title.trim() ||
-      !draft.authorName.trim() ||
-      !draft.recipientName.trim()
-    ) {
-      setError(
-        "Add a title, your name and who this memory is for, then start recording.",
-      );
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const r = await api<{ id: string }>("/api/memories", {
-        ...draft,
-        story: "",
-        scenePlan: null,
-      });
-      router.push(`/memory/${r.id}`);
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
+  async function ensureMemory() {
+    if (idRef.current) return idRef.current;
+    const r = await api<{ id: string }>("/api/memories", {
+      ...draftRef.current,
+      scenePlan: null,
+    });
+    idRef.current = r.id;
+    setCreatedId(r.id);
+    return r.id;
   }
   return (
     <>
@@ -355,7 +352,25 @@ export function Landing() {
             </span>
           </div>
           <form className="paper form-card" onSubmit={create}>
+            <VoiceRecorder
+              memoryId={createdId}
+              ensureMemory={ensureMemory}
+              onUse={(value) =>
+                setDraft({
+                  ...draftRef.current,
+                  story: value.story,
+                  narrationId: value.narrationId,
+                  scenePlan: null,
+                })
+              }
+            />
             <StoryFields draft={draft} setDraft={setDraft} />
+            <ReferencePhotos
+              memoryId={createdId || null}
+              references={references}
+              onChange={setReferences}
+              disabled={busy}
+            />
             <ErrorNotice error={error} />
             <button
               disabled={busy}
@@ -382,14 +397,6 @@ export function Landing() {
                 Open saved draft →
               </Link>
             )}
-            <button
-              type="button"
-              className="button subtle wide"
-              disabled={busy}
-              onClick={startVoice}
-            >
-              Start with my voice instead
-            </button>
             <p className="form-note">
               Your draft stays private. You decide when to share.
               <br />
@@ -553,7 +560,8 @@ export function Workspace({
     [includeNarration, setIncludeNarration] = useState(false),
     [shareUrl, setShareUrl] = useState(""),
     [copied, setCopied] = useState(false),
-    [reply, setReply] = useState<Record<string, string>>({});
+    [reply, setReply] = useState<Record<string, string>>({}),
+    [references, setReferences] = useState<PendingReference[]>([]);
   const generationAttempt = useRef<{ signature: string; id: string } | null>(
     null,
   );
@@ -585,6 +593,7 @@ export function Workspace({
           setCaption(m.publishedCaption || "");
           setShareUrl(m.shareUrl || "");
           setAdditions(chosen?.scene.authorAdditions || "");
+          setReferences(m.visualReferences ?? []);
           if (initialVersionId && chosen) {
             setDraft((d) => ({ ...d, scenePlan: chosen.scene.plan }));
             setApproved(true);
@@ -782,19 +791,22 @@ export function Workspace({
                   <VoiceRecorder
                     memoryId={id}
                     onUse={(value) => {
-                      setDraft({
-                        ...draft,
+                      setDraft((current) => ({
+                        ...current,
                         story: value.story,
                         narrationId: value.narrationId,
                         scenePlan: null,
-                      });
+                      }));
                       setApproved(false);
                     }}
-                    onSelect={(narrationId) =>
-                      setDraft({ ...draft, narrationId })
-                    }
                   />
                   <StoryFields draft={draft} setDraft={setDraft} />
+                  <ReferencePhotos
+                    memoryId={id}
+                    references={references}
+                    onChange={setReferences}
+                    disabled={!!busy}
+                  />
                   <div className="action-row">
                     <button
                       type="button"

@@ -380,6 +380,10 @@
 .conn-place-hit:focus-visible { outline:4px solid #f5dfad; outline-offset:-4px; }
 .conn-object-outline { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .conn-object-outline path { fill:#eecb6b38; stroke:#fff2b5; stroke-width:2.5px; stroke-linejoin:round; filter:drop-shadow(0 0 2px #243b2f); fill-rule:evenodd; }
+.conn-region-layer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.conn-region-layer path { pointer-events:auto; cursor:pointer; fill:#eecb6b2e; stroke:#fff2b5; stroke-width:2.5px; stroke-linejoin:round; fill-rule:evenodd; }
+.conn-region-layer path.is-selected { fill:#eecb6b73; stroke:#fff; }
+.conn-region-layer path:focus-visible { stroke:#f5dfad; stroke-width:4px; }
 .conn-image-credit { position:absolute; bottom:14px; left:14px; color:#fff; background:#26382b9c; padding:8px 10px; line-height:1; font-size:10px; letter-spacing:.1em; border-radius:4px; }
 .conn-note-composer { margin-top:18px; border:1px solid #dcd7c9; border-radius:10px; padding:0 20px 6px; background:#fbfaf5; }
 .conn-note-composer textarea { resize:vertical; font-size:15px; line-height:1.6; }

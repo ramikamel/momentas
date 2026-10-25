@@ -3,8 +3,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { ImageVersionView } from "@/lib/memory/types";
 import type { PinDraft, PublicPin } from "@/lib/memory/connections";
 import { DetailOutline } from "./detail-outline";
+import { outlineAnchor, outlineArea } from "@/lib/memory/outlines";
 import "./connections.css";
 type Position = { x: number; y: number };
+type Region = { id: string; label: string; path: string };
 export function DetailPinEditor({
   memoryId,
   version,
@@ -25,6 +27,8 @@ export function DetailPinEditor({
     [outline, setOutline] = useState<PublicPin["outline"] | null>(null),
     [finding, setFinding] = useState(false),
     [outlineNotice, setOutlineNotice] = useState(""),
+    [regions, setRegions] = useState<Region[]>([]),
+    [regionNote, setRegionNote] = useState(""),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const textarea = useRef<HTMLTextAreaElement>(null),
@@ -38,6 +42,49 @@ export function DetailPinEditor({
       request.current?.abort();
     },
     [],
+  );
+  useEffect(() => {
+    let ignore = false;
+    setRegionNote("Marking the things you can click…");
+    fetch(`/api/memories/${memoryId}/versions/${version.id}/regions`, {
+      method: "POST",
+    })
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Outlines unavailable.");
+        return (data.regions || []) as Region[];
+      })
+      .then((items) => {
+        if (ignore) return;
+        setRegions(items);
+        setRegionNote(
+          items.length
+            ? "Click an outline. Click a smaller one, such as a helmet, to choose that part. Click another outline to change it."
+            : "",
+        );
+      })
+      .catch(() => {
+        if (!ignore) setRegionNote("");
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [memoryId, version.id]);
+  function choose(region: Region) {
+    stopOutline();
+    const point = outlineAnchor(region.path);
+    setAdding(true);
+    setOutline({ path: region.path });
+    setPosition(point);
+    setCursor(point);
+    setFinding(false);
+    setOutlineNotice(
+      `Selected the ${region.label}. Click another outline to change it.`,
+    );
+    requestAnimationFrame(() => textarea.current?.focus());
+  }
+  const painted = [...regions].sort(
+    (a, b) => outlineArea(b.path) - outlineArea(a.path),
   );
   function stopOutline() {
     generation.current++;
@@ -147,9 +194,11 @@ export function DetailPinEditor({
         <div>
           <span className="conn-eyebrow">Your memory, in the details</span>
           <p id={helpId} className="conn-muted">
-            {adding
-              ? "Click a spot in the image, then tell its story."
-              : "Some things only you remember. Add a note to a person, object, or place."}
+            {regions.length
+              ? "The things in the picture are already outlined. Click one to leave a note, or click a smaller outline to choose just that part."
+              : adding
+                ? "Click a spot in the image, then tell its story."
+                : "Some things only you remember. Add a note to a person, object, or place."}
           </p>
         </div>
         {!adding && (
@@ -186,7 +235,13 @@ export function DetailPinEditor({
           alt="AI reconstruction of your memory"
           draggable={false}
         />
-        <DetailOutline outline={outline} />
+        <DetailOutline
+          outline={
+            regions.some((region) => region.path === outline?.path)
+              ? null
+              : outline
+          }
+        />
         {adding && (
           <button
             type="button"
@@ -230,6 +285,34 @@ export function DetailPinEditor({
             }}
           />
         )}
+        {painted.length > 0 && (
+          <svg
+            className="conn-region-layer"
+            viewBox="0 0 1000 1000"
+            preserveAspectRatio="none"
+          >
+            {painted.map((region) => (
+              <path
+                key={region.id}
+                d={region.path}
+                role="button"
+                tabIndex={busy ? -1 : 0}
+                aria-label={`Select the ${region.label}`}
+                className={outline?.path === region.path ? "is-selected" : ""}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!busy) choose(region);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (!busy) choose(region);
+                  }
+                }}
+              />
+            ))}
+          </svg>
+        )}
         {pins
           .filter((p) => p.id !== editing)
           .map((pin, i) => (
@@ -271,6 +354,11 @@ export function DetailPinEditor({
           <span className="conn-image-credit">AI RECONSTRUCTION</span>
         )}
       </div>
+      {regionNote && (
+        <p className="conn-small" role="status">
+          {regionNote}
+        </p>
+      )}
       {adding && !position && (
         <p className="conn-placement-hint">
           Tap or click the image to place your detail. You can also focus the

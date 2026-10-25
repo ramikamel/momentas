@@ -389,6 +389,17 @@ em {
   display: block;
   margin-bottom: 21px;
 }
+.reference-photos { border:0; margin:8px 0 22px; padding:0; }
+.reference-photos.is-disabled { opacity:.6; pointer-events:none; }
+.reference-legend { display:block; font-weight:600; font-size:11px; color:#555c51; letter-spacing:.04em; text-transform:uppercase; margin-bottom:8px; }
+.reference-add { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; align-items:end; }
+.reference-add .field { margin:0; }
+.reference-add .button { justify-self:start; }
+.reference-list { list-style:none; padding:0; margin:12px 0 16px; display:grid; gap:10px; }
+.reference-list li { display:flex; align-items:center; gap:12px; }
+.reference-list img { width:54px; height:54px; object-fit:cover; border-radius:6px; background:#ece8dc; }
+.reference-list span { display:flex; flex-direction:column; flex:1; }
+.reference-list small { color:#777c70; }
 .field > span {
   display: block;
   font-weight: 600;

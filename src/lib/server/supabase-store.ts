@@ -5,6 +5,7 @@ import type {
   ImageVersion,
   MemoryMessage,
   GeneratedImage,
+  VisualReference,
 } from "../memory/types";
 const memoryFields = {
   narrationId: "narration_id",
@@ -246,6 +247,61 @@ export function createSupabaseStore(
         method: "DELETE",
         body: JSON.stringify({ prefixes: [safePath(path)] }),
       });
+    },
+    async listVisualReferences(memoryId) {
+      try {
+        const rows = await query(
+          "memory_visual_references",
+          `${filter("memory_id", memoryId)}&order=created_at.asc`,
+        );
+        return (rows ?? []).map(
+          (row: Record<string, string>): VisualReference => ({
+            id: row.id,
+            memoryId: row.memory_id,
+            name: row.name,
+            kind: row.kind === "place" ? "place" : "person",
+            imagePath: row.image_path,
+            createdAt: row.created_at,
+          }),
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "";
+        if (/memory_visual_references|schema cache|PGRST205/i.test(message))
+          return [];
+        throw e;
+      }
+    },
+    async saveVisualReference(reference) {
+      try {
+        await request("/rest/v1/memory_visual_references", {
+          method: "POST",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            id: reference.id,
+            memory_id: reference.memoryId,
+            name: reference.name,
+            kind: reference.kind,
+            image_path: reference.imagePath,
+            created_at: reference.createdAt,
+          }),
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "";
+        if (/memory_visual_references|schema cache|PGRST205/i.test(message))
+          throw Object.assign(
+            new Error(
+              "Picture references need the latest database update before they can be saved.",
+            ),
+            { status: 503 },
+          );
+        throw e;
+      }
+    },
+    async removeVisualReference(memoryId, referenceId) {
+      await request(
+        `/rest/v1/memory_visual_references?${filter("id", referenceId)}&${filter("memory_id", memoryId)}`,
+        { method: "DELETE", headers: { Prefer: "return=minimal" } },
+      );
     },
     async imageUrl(path) {
       const result = await request(

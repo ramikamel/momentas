@@ -22,6 +22,7 @@ import type {
   ImageVersion,
   MemoryMessage,
   RenderRequest,
+  VisualReference,
 } from "../memory/types";
 type State = {
   outlineRequests?: {
@@ -40,6 +41,7 @@ type State = {
   versions: ImageVersion[];
   messages: MemoryMessage[];
   requests: RenderRequest[];
+  references: VisualReference[];
 };
 const locks = new Map<string, Promise<unknown>>();
 function error(message: string, status = 409): never {
@@ -73,8 +75,10 @@ export function createLocalStore(directory: string): Store {
             pins: {},
             links: [],
             connectionRequests: [],
+            references: [],
           };
         }
+        state.references ??= [];
         state.publications ??= [];
         state.narrations ??= [];
         state.pins ??= {};
@@ -641,6 +645,34 @@ export function createLocalStore(directory: string): Store {
         if (e.code !== "ENOENT") throw e;
       });
     },
+    listVisualReferences: (memoryId) =>
+      transaction(
+        (s) => s.references.filter((r) => r.memoryId === memoryId),
+        false,
+      ),
+    saveVisualReference: (reference) =>
+      transaction((s) => {
+        memory(s, reference.memoryId);
+        if (
+          !reference.imagePath.startsWith(`refs/${reference.memoryId}/`) ||
+          s.references.some((r) => r.id === reference.id)
+        )
+          error("Invalid reference picture", 400);
+        if (
+          s.references.filter((r) => r.memoryId === reference.memoryId).length >=
+          4
+        )
+          error("You can add up to four reference pictures.", 409);
+        s.references.push(structuredClone(reference));
+      }),
+    removeVisualReference: (memoryId, referenceId) =>
+      transaction((s) => {
+        const index = s.references.findIndex(
+          (r) => r.id === referenceId && r.memoryId === memoryId,
+        );
+        if (index < 0) error("Picture not found", 404);
+        s.references.splice(index, 1);
+      }),
     async imageUrl(path, mid, vid, token) {
       imagePath(path);
       return `/api/memories/${encodeURIComponent(mid)}/images/${encodeURIComponent(vid)}${token ? `?share=${encodeURIComponent(token)}` : ""}`;

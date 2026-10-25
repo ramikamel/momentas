@@ -52,3 +52,23 @@ it.each(["generate", "edit"] as const)("sends the photography default to Muse fo
     expect(request.body.prompt).toMatch(/preserve.*composition/is);
   }
 });
+
+it("sends named reference photographs through the edit endpoint", async () => {
+  vi.stubEnv("MODEL_API_KEY", "test-only-key");
+  vi.stubEnv("E2E_TEST_MODE", "");
+  const requests: { path: string; body: { prompt: string; images?: unknown[] } }[] = [];
+  vi.stubGlobal("fetch", async (url: string, options: RequestInit) => {
+    requests.push({ path: new URL(url).pathname, body: JSON.parse(options.body as string) });
+    return Response.json({ data: [{ b64_json: b64 }] });
+  });
+  const reference = {
+    name: "Dad",
+    kind: "person" as const,
+    image: { bytes: Buffer.from(b64, "base64"), mimeType: "image/jpeg" },
+  };
+  await getAiProvider().generateImage(scene, [reference]);
+  expect(requests[0].path).toBe("/v1/images/edits");
+  expect(requests[0].body.images).toHaveLength(1);
+  expect(requests[0].body.prompt).toContain("Person named “Dad”");
+  expect(requests[0].body.prompt).toContain("An empty parking lot");
+});

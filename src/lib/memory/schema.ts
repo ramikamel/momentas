@@ -1,5 +1,6 @@
 import { z } from "zod";
 const text = (max: number) => z.string().trim().min(1).max(max);
+const optionalLabel = (max: number) => z.string().trim().max(max);
 const sourcedDetail = z.object({ text: text(1000), sourceQuote: text(6000) });
 export const scenePlanSchema = z.object({
   setting: sourcedDetail.nullable(),
@@ -10,9 +11,9 @@ export const scenePlanSchema = z.object({
   followUpQuestions: z.array(text(300)).max(2),
 });
 export const draftSchema = z.object({
-  title: text(120),
-  authorName: text(80),
-  recipientName: text(80),
+  title: optionalLabel(120),
+  authorName: optionalLabel(80),
+  recipientName: optionalLabel(80),
   story: z.string().trim().max(6000),
   narrationId: z.uuid().nullable().default(null),
   scenePlan: scenePlanSchema.nullable().default(null),

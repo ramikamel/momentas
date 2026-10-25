@@ -5,6 +5,8 @@ import type {
   PublicPin,
   PerspectiveLink,
 } from "./connections";
+import type { VisualReference, VisualReferenceView } from "./references";
+export type { VisualReference, VisualReferenceView };
 export type SourcedDetail = { text: string; sourceQuote: string };
 export type ScenePlan = {
   setting: SourcedDetail | null;
@@ -87,6 +89,7 @@ export type AuthorMemoryView = DraftInput & {
   id: string;
   createdAt: string;
   versions: ImageVersionView[];
+  visualReferences?: VisualReferenceView[];
   messages: MemoryMessage[];
   publishedVersionId: string | null;
   publishedCaption: string;
@@ -151,6 +154,9 @@ export type Store = ConnectionStore & {
     versionId: string,
     shareToken?: string,
   ): Promise<string>;
+  listVisualReferences(memoryId: string): Promise<VisualReference[]>;
+  saveVisualReference(reference: VisualReference): Promise<void>;
+  removeVisualReference(memoryId: string, referenceId: string): Promise<void>;
 };
 
 export type SavedMemory = {

@@ -27,6 +27,7 @@ import {
   requireComparison,
 } from "./authorization";
 import { PerspectiveService } from "./perspectives";
+import { referenceImages } from "./references";
 import { z } from "zod";
 
 export class MemoryService {
@@ -107,6 +108,14 @@ export class MemoryService {
           return { ...v, audioUrl: await this.store.audioUrl(n) };
         }),
       ),
+      visualReferences: (
+        await this.store.listVisualReferences(id)
+      ).map((reference) => ({
+        id: reference.id,
+        name: reference.name,
+        kind: reference.kind,
+        imageUrl: `/api/memories/${id}/references/${reference.id}`,
+      })),
       pinsByVersion: Object.fromEntries(
         await Promise.all(
           versions.map(async (v) => [
@@ -244,13 +253,15 @@ export class MemoryService {
   ): Promise<ImageVersionView> {
     let uploadedPath: string | null = null;
     try {
+      const references = await referenceImages(this.store, id);
       const image = base
         ? await this.ai.editImage(
             await this.store.readImage(base.imagePath),
             input.scene,
             input.instruction!,
+            references,
           )
-        : await this.ai.generateImage(input.scene);
+        : await this.ai.generateImage(input.scene, references);
       validateGeneratedImage(image);
       const versionId = randomUUID(),
         extension =

@@ -3,6 +3,7 @@ import type {
   GeneratedImage,
   ScenePlan,
 } from "@/lib/memory/types";
+import type { ReferenceKind } from "@/lib/memory/references";
 import { scenePlanSchema } from "@/lib/memory/schema";
 import {
   buildImagePrompt,
@@ -12,14 +13,23 @@ import {
 import { z } from "zod";
 import { AppError } from "./access";
 
+export type ImageReference = {
+  name: string;
+  kind: ReferenceKind;
+  image: GeneratedImage;
+};
 export type AiProvider = {
   configured?: boolean;
   extractScene(story: string): Promise<ScenePlan>;
-  generateImage(scene: ApprovedScene): Promise<GeneratedImage>;
+  generateImage(
+    scene: ApprovedScene,
+    references?: ImageReference[],
+  ): Promise<GeneratedImage>;
   editImage(
     image: GeneratedImage,
     scene: ApprovedScene,
     instruction: string,
+    references?: ImageReference[],
   ): Promise<GeneratedImage>;
 };
 async function metaRequest(
@@ -94,6 +104,9 @@ export function validateGeneratedImage(image: GeneratedImage): void {
       502,
       "INVALID_IMAGE",
     );
+}
+function imageDataUrl(image: GeneratedImage) {
+  return `data:${image.mimeType};base64,${Buffer.from(image.bytes).toString("base64")}`;
 }
 function readImageResult(value: Record<string, unknown>): GeneratedImage {
   const data = value.data as { b64_json?: string }[] | undefined;
@@ -185,13 +198,33 @@ export function getAiProvider(): AiProvider {
         );
       }
     },
-    async generateImage(scene) {
+    async generateImage(scene, references = []) {
+      const named = references.map(({ name, kind }) => ({ name, kind }));
+      if (!references.length)
+        return readImageResult(
+          await metaRequest("/images/generations", {
+            model: process.env.META_IMAGE_MODEL || "muse-image-1.0",
+            prompt: buildImagePrompt(scene),
+            n: 1,
+            size: "1536x1024",
+            response_format: "b64_json",
+            output_format: "webp",
+            reasoning_strength: "low",
+            tool_enablement: {
+              enable_image_search: false,
+              enable_web_search: false,
+              enable_shell: false,
+            },
+          }),
+        );
       return readImageResult(
-        await metaRequest("/images/generations", {
+        await metaRequest("/images/edits", {
           model: process.env.META_IMAGE_MODEL || "muse-image-1.0",
-          prompt: buildImagePrompt(scene),
+          images: references.map((reference) => ({
+            image_url: imageDataUrl(reference.image),
+          })),
+          prompt: buildImagePrompt(scene, undefined, named),
           n: 1,
-          size: "1536x1024",
           response_format: "b64_json",
           output_format: "webp",
           reasoning_strength: "low",
@@ -203,16 +236,18 @@ export function getAiProvider(): AiProvider {
         }),
       );
     },
-    async editImage(image, scene, instruction) {
+    async editImage(image, scene, instruction, references = []) {
       return readImageResult(
         await metaRequest("/images/edits", {
           model: process.env.META_IMAGE_MODEL || "muse-image-1.0",
-          images: [
-            {
-              image_url: `data:${image.mimeType};base64,${Buffer.from(image.bytes).toString("base64")}`,
-            },
-          ],
-          prompt: buildImagePrompt(scene, instruction),
+          images: [image, ...references.map((reference) => reference.image)].map(
+            (item) => ({ image_url: imageDataUrl(item) }),
+          ),
+          prompt: buildImagePrompt(
+            scene,
+            instruction,
+            references.map(({ name, kind }) => ({ name, kind })),
+          ),
           n: 1,
           response_format: "b64_json",
           output_format: "webp",

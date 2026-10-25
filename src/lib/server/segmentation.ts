@@ -12,7 +12,9 @@ import type { GeneratedImage, Store } from "@/lib/memory/types";
 import { outlineSchema } from "@/lib/memory/pins";
 import { requireAuthor } from "./authorization";
 import { AppError } from "./access";
+import { z } from "zod";
 export type ObjectOutline = NonNullable<PublicPin["outline"]>;
+export type VisibleRegion = { id: string; label: string; path: string };
 type Point = { x: number; y: number };
 export function pixelPoint(
   x: number,
@@ -68,11 +70,7 @@ function simplify(points: Point[], tolerance: number): Point[] {
       ]
     : [first, last];
 }
-export async function outlineFromText(
-  text: string,
-  width: number,
-  height: number,
-): Promise<ObjectOutline | null> {
+async function maskRecords(text: string, width: number, height: number) {
   if (
     text.length > 1024 * 1024 ||
     width < 1 ||
@@ -90,10 +88,13 @@ export async function outlineFromText(
   const result = await parseImageStream(events()).finalResult;
   if (result.diagnostics.some((d) => d.severity === "error"))
     throw new Error("Invalid segmentation");
-  const record = recordsOfKind(result.records, "mask").find(
-    (r) => r.objectId === "1",
-  );
-  if (!record) return null;
+  return recordsOfKind(result.records, "mask");
+}
+function pathForMask(
+  record: Awaited<ReturnType<typeof maskRecords>>[number],
+  width: number,
+  height: number,
+) {
   const b = record.bounds;
   if (
     b.left < 0 ||
@@ -134,22 +135,64 @@ export async function outlineFromText(
         .join("") + "Z",
     );
   }
-  if (!paths.length) return null;
-  return outlineSchema.parse({ path: paths.join("") });
+  return paths.length ? paths.join("") : null;
 }
-export async function segmentImage(
-  image: GeneratedImage,
-  x: number,
-  y: number,
+export async function outlineFromText(
+  text: string,
+  width: number,
+  height: number,
 ): Promise<ObjectOutline | null> {
-  if (!process.env.MODEL_API_KEY)
-    throw new AppError(
-      "Object outlines are unavailable. You can still save a pin.",
-      503,
-    );
-  const { data, info } = await sharp(image.bytes, {
-    limitInputPixels: 20000000,
-  })
+  const record = (await maskRecords(text, width, height)).find(
+    (r) => r.objectId === "1",
+  );
+  if (!record) return null;
+  const path = pathForMask(record, width, height);
+  if (!path) return null;
+  return outlineSchema.parse({ path });
+}
+export async function regionsFromText(
+  text: string,
+  width: number,
+  height: number,
+  label: string,
+): Promise<VisibleRegion[]> {
+  const regions: VisibleRegion[] = [];
+  for (const record of await maskRecords(text, width, height)) {
+    const path = pathForMask(record, width, height);
+    if (!path) continue;
+    regions.push({
+      id: `${label}-${record.objectId}`.replace(/\s+/g, "-"),
+      label,
+      path: outlineSchema.parse({ path }).path,
+    });
+  }
+  return regions;
+}
+const conceptSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z][a-z0-9]*(?:[ '-][a-z0-9]+){0,3}$/);
+export function conceptPhrases(raw: unknown): string[] {
+  const values = z
+    .object({ concepts: z.array(z.string()).max(12) })
+    .parse(raw).concepts;
+  const phrases: string[] = [];
+  for (const value of values) {
+    const phrase = conceptSchema.safeParse(value);
+    if (
+      !phrase.success ||
+      phrases.includes(phrase.data) ||
+      /^(segment|find|show|which|where|what)\b/.test(phrase.data)
+    )
+      continue;
+    phrases.push(phrase.data);
+    if (phrases.length === 5) break;
+  }
+  return phrases;
+}
+async function preparedImage(image: GeneratedImage) {
+  return sharp(Buffer.from(image.bytes), { limitInputPixels: 20000000 })
     .rotate()
     .resize({
       width: 768,
@@ -159,11 +202,16 @@ export async function segmentImage(
     })
     .png()
     .toBuffer({ resolveWithObject: true });
-  const point = pixelPoint(x, y, info.width, info.height);
-  const prompt = buildObjectPrompt({
-    size: { width: info.width, height: info.height },
-    objects: [{ id: 1, prompts: [{ points: [point] }] }],
-  });
+}
+async function samText(
+  png: Buffer,
+  inputText: string,
+): Promise<string> {
+  if (!process.env.MODEL_API_KEY)
+    throw new AppError(
+      "Object outlines are unavailable. You can still save a pin.",
+      503,
+    );
   const r = await fetch(
     `${(process.env.META_BASE_URL || "https://api.meta.ai/v1").replace(/\/$/, "")}/responses`,
     {
@@ -181,10 +229,10 @@ export async function segmentImage(
             type: "message",
             role: "user",
             content: [
-              { type: "input_text", text: prompt },
+              { type: "input_text", text: inputText },
               {
                 type: "input_image",
-                image_url: `data:image/png;base64,${data.toString("base64")}`,
+                image_url: `data:image/png;base64,${png.toString("base64")}`,
               },
             ],
           },
@@ -220,20 +268,190 @@ export async function segmentImage(
   }
   const result = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   if (result.status !== "completed") throw new Error("Incomplete segmentation");
-  const text = (result.output || [])
+  return (result.output || [])
     .flatMap(
       (o: { content?: { type: string; text?: string }[] }) => o.content || [],
     )
     .filter((c: { type: string }) => c.type === "output_text")
     .map((c: { text: string }) => c.text)
     .join("");
-  return outlineFromText(text, info.width, info.height);
 }
+export async function segmentImage(
+  image: GeneratedImage,
+  x: number,
+  y: number,
+): Promise<ObjectOutline | null> {
+  const { data, info } = await preparedImage(image);
+  const point = pixelPoint(x, y, info.width, info.height);
+  const prompt = buildObjectPrompt({
+    size: { width: info.width, height: info.height },
+    objects: [{ id: 1, prompts: [{ points: [point] }] }],
+  });
+  return outlineFromText(
+    await samText(data, prompt),
+    info.width,
+    info.height,
+  );
+}
+export async function listVisibleConcepts(
+  image: GeneratedImage,
+): Promise<string[]> {
+  if (!process.env.MODEL_API_KEY) return [];
+  const { data } = await preparedImage(image);
+  const result = await fetch(
+    `${(process.env.META_BASE_URL || "https://api.meta.ai/v1").replace(/\/$/, "")}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.MODEL_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(45000),
+      body: JSON.stringify({
+        model: process.env.META_TEXT_MODEL || "muse-spark-1.3",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Name the distinct visible things in this photograph that a person could point at. Include a separate short noun phrase for a visually distinct part, such as a helmet, hat, glasses, shirt, or bicycle, in addition to the person wearing or riding it. Return at most 5 concepts. Each concept is a noun phrase of at most four words. No commands or sentences.",
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/png;base64,${data.toString("base64")}`,
+                },
+              },
+            ],
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "VisibleThings",
+            strict: true,
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              required: ["concepts"],
+              properties: {
+                concepts: {
+                  type: "array",
+                  maxItems: 5,
+                  items: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      }),
+    },
+  );
+  if (!result.ok) {
+    await result.body?.cancel();
+    return [];
+  }
+  try {
+    const body = (await result.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    return conceptPhrases(
+      JSON.parse(body.choices?.[0]?.message?.content || "{}"),
+    );
+  } catch {
+    return [];
+  }
+}
+export async function segmentConcept(
+  image: GeneratedImage,
+  concept: string,
+): Promise<VisibleRegion[]> {
+  const phrase = conceptPhrases({ concepts: [concept] })[0];
+  if (!phrase) return [];
+  const { data, info } = await preparedImage(image);
+  return regionsFromText(
+    await samText(data, phrase),
+    info.width,
+    info.height,
+    phrase,
+  );
+}
+const discovered = new Map<string, Promise<VisibleRegion[]>>();
 export class SegmentationService {
   constructor(
     private store: Store,
     private provider = segmentImage,
+    private concepts = listVisibleConcepts,
+    private conceptSegment = segmentConcept,
   ) {}
+  async discover(
+    auth: AuthorAuth,
+    versionId: string,
+  ): Promise<VisibleRegion[]> {
+    await requireAuthor(this.store, auth);
+    const v = (await this.store.versions(auth.memoryId)).find(
+      (item) => item.id === versionId,
+    );
+    if (!v) throw new AppError("Image not found.", 404);
+    if (process.env.E2E_TEST_MODE === "1") {
+      if (process.env.NODE_ENV === "production")
+        throw new AppError("Test mode is unavailable.", 503);
+      return [];
+    }
+    const key = `${auth.memoryId}:${versionId}`;
+    const pending = discovered.get(key);
+    if (pending) return pending;
+    const job = this.findRegions(auth, versionId, v.imagePath).catch((e) => {
+      discovered.delete(key);
+      throw e;
+    });
+    discovered.set(key, job);
+    return job;
+  }
+  private async findRegions(
+    auth: AuthorAuth,
+    versionId: string,
+    imagePath: string,
+  ) {
+    const image = await this.store.readImage(imagePath);
+    let concepts: string[] = [];
+    try {
+      concepts = await this.concepts(image);
+    } catch {
+      return [];
+    }
+    const regions: VisibleRegion[] = [];
+    for (const concept of concepts) {
+      const requestId = randomUUID();
+      try {
+        await this.store.reserveDetailOutline(
+          auth.memoryId,
+          versionId,
+          requestId,
+        );
+      } catch {
+        break;
+      }
+      let success = false;
+      try {
+        regions.push(...(await this.conceptSegment(image, concept)));
+        success = true;
+      } catch {
+        // One missed concept still leaves the others clickable.
+      } finally {
+        await this.store
+          .finishDetailOutline(auth.memoryId, versionId, requestId, success)
+          .catch(() => {});
+      }
+    }
+    const seen = new Set<string>();
+    return regions.filter((region) => {
+      if (seen.has(region.path)) return false;
+      seen.add(region.path);
+      return true;
+    });
+  }
   async select(auth: AuthorAuth, versionId: string, x: number, y: number) {
     await requireAuthor(this.store, auth);
     const v = (await this.store.versions(auth.memoryId)).find(
