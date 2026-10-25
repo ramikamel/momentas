@@ -139,7 +139,6 @@ function StoryFields({
       <Field label="Give this memory a title">
         <input
           maxLength={120}
-          required
           placeholder="The day you let go"
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
@@ -148,7 +147,6 @@ function StoryFields({
       <div className="field-grid">
         <Field label="Your name">
           <input
-            required
             maxLength={80}
             placeholder="Alex"
             value={draft.authorName}
@@ -157,7 +155,6 @@ function StoryFields({
         </Field>
         <Field label="Who is it for?">
           <input
-            required
             maxLength={80}
             placeholder="Dad"
             value={draft.recipientName}
