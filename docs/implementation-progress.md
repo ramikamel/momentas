@@ -63,3 +63,13 @@ Ruling: all three low-reasoning subagents reached the account usage limit after 
 Ruling: local Turbopack production compilation could not bind its helper port under the host sandbox. The supported webpack production builder passed; hosted Vercel compilation is separately verified at release. No product dependency or remote runtime workaround was introduced.
 
 The fictional showcase has two distinct real Muse images (existing child view and one new father view), quote pins and cached insights. It deliberately contains no fabricated narrator voices: the presenter can add their actual recordings through the app. Owner capabilities, downloaded test speech, screenshots, and prepared files remain ignored.
+
+
+## Connection extension release verification
+
+- Merged and pushed implementation through `4dfbb6a` to GitHub main. Production deployment `dpl_EnCpifdvZSDYHRKcSs13nWFQxMu1` reached READY with the normal Vercel build.
+- The existing Vercel project now reports https://www.momentas.tech as its production alias; https://momentas-hacktx.vercel.app also returns 200. No domains were modified during this release.
+- Hosted browser verification passed on the custom domain: voice-first entry, two distinct loaded comparison images, desktop/mobile screenshots, no mobile overflow, and no browser errors. Authenticated WAV upload and real Muse transcription returned a saved 107-character transcript. Owner audio access succeeded; anonymous draft/audio access was denied. Test speech remained private and outside the showcase.
+- Final primary-main verification: 43 tests in 12 files passed; lint and TypeScript passed. The three full browser journeys and the webpack production bundle passed before release; the remote production build also passed.
+- Showcase: https://www.momentas.tech/compare/Mb93rbSsERGc7wjm_DIyOqVd2k0CiFI1qeQK7-v39BQ . This is a clearly labeled fictional example with real Muse images and grounded insights; it has no recorded narrator voices.
+- Hosted screenshots are preserved locally under output/connection-features/hosted; private capabilities, fixture audio, configuration and artifacts remain ignored.
