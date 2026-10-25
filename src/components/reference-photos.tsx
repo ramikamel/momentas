@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { ImagePlus } from "lucide-react";
 import type { VisualReferenceView } from "@/lib/memory/references";
 
 export type PendingReference = {
@@ -25,7 +26,18 @@ export function ReferencePhotos({
   const [name, setName] = useState(""),
     [kind, setKind] = useState<"person" | "place">("person"),
     [file, setFile] = useState<File | null>(null),
+    [preview, setPreview] = useState(""),
     [error, setError] = useState("");
+  const picker = useRef<HTMLInputElement>(null);
+  function choose(next: File | null) {
+    if (preview) URL.revokeObjectURL(preview);
+    setFile(next);
+    setPreview(next ? URL.createObjectURL(next) : "");
+  }
+  function clearChoice() {
+    choose(null);
+    if (picker.current) picker.current.value = "";
+  }
   async function add() {
     if (!file || !name.trim() || disabled) return;
     setError("");
@@ -41,7 +53,7 @@ export function ReferencePhotos({
         },
       ]);
       setName("");
-      setFile(null);
+      clearChoice();
       return;
     }
     const body = new FormData();
@@ -59,7 +71,7 @@ export function ReferencePhotos({
     }
     onChange([...references, data as VisualReferenceView]);
     setName("");
-    setFile(null);
+    clearChoice();
   }
   async function remove(reference: PendingReference) {
     if (reference.file) {
@@ -109,7 +121,26 @@ export function ReferencePhotos({
         </ul>
       )}
       {references.length < 4 && (
-        <div className="reference-add">
+        <div className="reference-composer">
+          <label className="reference-picker">
+            <input
+              ref={picker}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => choose(e.target.files?.[0] ?? null)}
+            />
+            {preview ? (
+              <img src={preview} alt="" />
+            ) : (
+              <span className="reference-placeholder" aria-hidden="true">
+                <ImagePlus size={18} />
+              </span>
+            )}
+            <span>
+              <strong>{file ? file.name : "Choose a photo"}</strong>
+              <small>JPEG, PNG, or WebP</small>
+            </span>
+          </label>
           <label className="field">
             <span>Name in the memory</span>
             <input
@@ -119,29 +150,27 @@ export function ReferencePhotos({
               onChange={(e) => setName(e.target.value)}
             />
           </label>
-          <label className="field">
-            <span>This picture is</span>
-            <select
-              value={kind}
-              onChange={(e) =>
-                setKind(e.target.value === "place" ? "place" : "person")
-              }
+          <div className="reference-kinds" role="group" aria-label="This picture is">
+            <button
+              type="button"
+              className={kind === "person" ? "is-selected" : ""}
+              aria-pressed={kind === "person"}
+              onClick={() => setKind("person")}
             >
-              <option value="person">A person</option>
-              <option value="place">A place</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>Photo</span>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
+              A person
+            </button>
+            <button
+              type="button"
+              className={kind === "place" ? "is-selected" : ""}
+              aria-pressed={kind === "place"}
+              onClick={() => setKind("place")}
+            >
+              A place
+            </button>
+          </div>
           <button
             type="button"
-            className="button subtle"
+            className="button subtle wide"
             disabled={!file || !name.trim()}
             onClick={() => void add()}
           >

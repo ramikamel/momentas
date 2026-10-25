@@ -389,17 +389,95 @@ em {
   display: block;
   margin-bottom: 21px;
 }
-.reference-photos { border:0; margin:8px 0 22px; padding:0; }
-.reference-photos.is-disabled { opacity:.6; pointer-events:none; }
-.reference-legend { display:block; font-weight:600; font-size:11px; color:#555c51; letter-spacing:.04em; text-transform:uppercase; margin-bottom:8px; }
-.reference-add { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; align-items:end; }
-.reference-add .field { margin:0; }
-.reference-add .button { justify-self:start; }
-.reference-list { list-style:none; padding:0; margin:12px 0 16px; display:grid; gap:10px; }
-.reference-list li { display:flex; align-items:center; gap:12px; }
-.reference-list img { width:54px; height:54px; object-fit:cover; border-radius:6px; background:#ece8dc; }
-.reference-list span { display:flex; flex-direction:column; flex:1; }
-.reference-list small { color:#777c70; }
+.reference-photos { margin: 4px 0 22px; }
+.reference-photos.is-disabled { opacity: .6; pointer-events: none; }
+.reference-legend { display: block; font-weight: 600; font-size: 11px; color: #555c51; margin-bottom: 8px; }
+.reference-photos > .muted { margin: 0 0 14px; max-width: none; }
+.reference-composer { display: grid; gap: 12px; }
+.reference-composer .field { margin: 0; }
+.reference-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 74px;
+  padding: 10px;
+  border: 1px solid #dedfd5;
+  border-radius: 5px;
+  background: #fffef9;
+  cursor: pointer;
+}
+.reference-picker:hover,
+.reference-picker:focus-within { border-color: var(--accent); background: #fffaf6; }
+.reference-picker input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.reference-picker img,
+.reference-placeholder {
+  width: 54px;
+  height: 54px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.reference-picker img { object-fit: cover; background: #ece8dc; }
+.reference-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: #f3eee6;
+  border: 1px solid #e6dfd2;
+}
+.reference-picker strong,
+.reference-list strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.reference-picker small,
+.reference-list small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.reference-picker span:last-child { min-width: 0; }
+.reference-picker strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reference-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.reference-kinds button {
+  height: 46px;
+  border: 1px solid #dedfd5;
+  border-radius: 4px;
+  background: #fffef9;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.reference-kinds button.is-selected {
+  border-color: var(--accent);
+  background: #f8efe9;
+  color: var(--accent);
+}
+.reference-list { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 8px; }
+.reference-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fffef9;
+}
+.reference-list img { width: 54px; height: 54px; object-fit: cover; border-radius: 4px; background: #ece8dc; }
+.reference-list span { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.reference-list .quiet-link { color: var(--accent); font-size: 12px; font-weight: 600; }
 .field > span {
   display: block;
   font-weight: 600;
