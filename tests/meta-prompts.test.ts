@@ -58,7 +58,10 @@ it.each(["generate", "edit"] as const)(
       `/v1/images/${operation === "generate" ? "generations" : "edits"}`,
     );
     expect(request.body.prompt).toMatch(/photorealistic candid photograph/i);
-    expect(request.body.prompt).toMatch(/natural.*light/i);
+    expect(request.body.prompt).toMatch(/natural available light/i);
+    expect(request.body.prompt).toMatch(/whole frame in clear focus/i);
+    expect(request.body.prompt).toMatch(/ordinary physics/i);
+    expect(request.body.prompt).toMatch(/nothing floats/i);
     expect(request.body.prompt).toContain("An empty parking lot");
     expect(request.body.prompt).toContain("The bicycle was red.");
     expect(request.body.prompt).toContain("The lot felt enormous");
