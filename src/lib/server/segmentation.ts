@@ -3,6 +3,7 @@ import sharp from "sharp";
 import {
   buildObjectPrompt,
   decodeMaskToSVGPath,
+  decodeMaskToRaster,
   parseImageStream,
   recordsOfKind,
   type ResponsesEvent,
@@ -68,11 +69,12 @@ function simplify(points: Point[], tolerance: number): Point[] {
       ]
     : [first, last];
 }
-export async function outlineFromText(
+export async function objectsFromText(
   text: string,
   width: number,
   height: number,
-): Promise<ObjectOutline | null> {
+  label = "object",
+): Promise<import("@/lib/memory/personalization").DetectedObject[]> {
   if (
     text.length > 1024 * 1024 ||
     width < 1 ||
@@ -90,58 +92,81 @@ export async function outlineFromText(
   const result = await parseImageStream(events()).finalResult;
   if (result.diagnostics.some((d) => d.severity === "error"))
     throw new Error("Invalid segmentation");
-  const record = recordsOfKind(result.records, "mask").find(
-    (r) => r.objectId === "1",
-  );
-  if (!record) return null;
-  const b = record.bounds;
-  if (
-    b.left < 0 ||
-    b.top < 0 ||
-    b.right > width ||
-    b.bottom > height ||
-    record.mask.width * record.mask.height > 1024 * 1024
-  )
-    throw new Error("Invalid mask bounds");
-  const raw = decodeMaskToSVGPath(record.mask);
-  const paths: string[] = [];
-  for (const contour of raw.split(/(?=M)/)) {
-    const n = contour.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
-    if (n.length < 6) continue;
-    const points: Point[] = [];
-    for (let i = 0; i < n.length; i += 2)
-      points.push({ x: n[i] + b.left, y: n[i + 1] + b.top });
-    // Split a closed contour at its furthest point before simplifying it.
-    let split = 1;
-    for (let i = 2; i < points.length; i++)
-      if (
-        (points[i].x - points[0].x) ** 2 + (points[i].y - points[0].y) ** 2 >
-        (points[split].x - points[0].x) ** 2 +
-          (points[split].y - points[0].y) ** 2
-      )
-        split = i;
-    const simplified = [
-      ...simplify(points.slice(0, split + 1), 1.5).slice(0, -1),
-      ...simplify([...points.slice(split), points[0]], 1.5).slice(0, -1),
-    ];
-    if (simplified.length < 3) continue;
-    paths.push(
-      simplified
-        .map(
-          (p, i) =>
-            `${i ? "L" : "M"}${Math.round(Math.max(0, Math.min(1000, (p.x / width) * 1000)))},${Math.round(Math.max(0, Math.min(1000, (p.y / height) * 1000)))}`,
+  const objects: import("@/lib/memory/personalization").DetectedObject[] = [];
+  for (const record of recordsOfKind(result.records, "mask")) {
+    const b = record.bounds;
+    if (
+      b.left < 0 ||
+      b.top < 0 ||
+      b.right > width ||
+      b.bottom > height ||
+      record.mask.width * record.mask.height > 1024 * 1024
+    )
+      throw new Error("Invalid mask bounds");
+    const raw = decodeMaskToSVGPath(record.mask);
+    const paths: string[] = [];
+    for (const contour of raw.split(/(?=M)/)) {
+      const n = contour.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
+      if (n.length < 6) continue;
+      const points: Point[] = [];
+      for (let i = 0; i < n.length; i += 2)
+        points.push({ x: n[i] + b.left, y: n[i + 1] + b.top });
+      // Split a closed contour at its furthest point before simplifying it.
+      let split = 1;
+      for (let i = 2; i < points.length; i++)
+        if (
+          (points[i].x - points[0].x) ** 2 + (points[i].y - points[0].y) ** 2 >
+          (points[split].x - points[0].x) ** 2 +
+            (points[split].y - points[0].y) ** 2
         )
-        .join("") + "Z",
-    );
+          split = i;
+      const simplified = [
+        ...simplify(points.slice(0, split + 1), 1.5).slice(0, -1),
+        ...simplify([...points.slice(split), points[0]], 1.5).slice(0, -1),
+      ];
+      if (simplified.length < 3) continue;
+      paths.push(
+        simplified
+          .map(
+            (p, i) =>
+              `${i ? "L" : "M"}${Math.round(Math.max(0, Math.min(1000, (p.x / width) * 1000)))},${Math.round(Math.max(0, Math.min(1000, (p.y / height) * 1000)))}`,
+          )
+          .join("") + "Z",
+      );
+    }
+    if (!paths.length) continue;
+    const raster = decodeMaskToRaster(record.mask);
+    const area =
+      raster.reduce((n, value) => n + (value ? 1 : 0), 0) / (width * height);
+    objects.push({
+      id: `${label}-${record.objectId}`,
+      label,
+      x: (b.left + b.right) / (2 * width),
+      y: (b.top + b.bottom) / (2 * height),
+      area,
+      outline: outlineSchema.parse({ path: paths.join("") }),
+    });
   }
-  if (!paths.length) return null;
-  return outlineSchema.parse({ path: paths.join("") });
+  return objects;
+}
+export async function outlineFromText(
+  text: string,
+  width: number,
+  height: number,
+): Promise<ObjectOutline | null> {
+  return (
+    (await objectsFromText(text, width, height)).find(
+      (o) => o.id === "object-1",
+    )?.outline ?? null
+  );
 }
 export async function segmentImage(
   image: GeneratedImage,
-  x: number,
-  y: number,
-): Promise<ObjectOutline | null> {
+  x: number | string,
+  y = 0,
+): Promise<
+  ObjectOutline | import("@/lib/memory/personalization").DetectedObject[] | null
+> {
   if (!process.env.MODEL_API_KEY)
     throw new AppError(
       "Object outlines are unavailable. You can still save a pin.",
@@ -159,11 +184,15 @@ export async function segmentImage(
     })
     .png()
     .toBuffer({ resolveWithObject: true });
-  const point = pixelPoint(x, y, info.width, info.height);
-  const prompt = buildObjectPrompt({
-    size: { width: info.width, height: info.height },
-    objects: [{ id: 1, prompts: [{ points: [point] }] }],
-  });
+  const point =
+    typeof x === "number" ? pixelPoint(x, y, info.width, info.height) : null;
+  const prompt =
+    typeof x === "string"
+      ? x
+      : buildObjectPrompt({
+          size: { width: info.width, height: info.height },
+          objects: [{ id: 1, prompts: [{ points: [point!] }] }],
+        });
   const r = await fetch(
     `${(process.env.META_BASE_URL || "https://api.meta.ai/v1").replace(/\/$/, "")}/responses`,
     {
@@ -172,7 +201,7 @@ export async function segmentImage(
         Authorization: `Bearer ${process.env.MODEL_API_KEY}`,
         "Content-Type": "application/json",
       },
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(30000),
       body: JSON.stringify({
         model: "sam-3.1",
         stream: false,
@@ -227,12 +256,19 @@ export async function segmentImage(
     .filter((c: { type: string }) => c.type === "output_text")
     .map((c: { text: string }) => c.text)
     .join("");
-  return outlineFromText(text, info.width, info.height);
+  return typeof x === "string"
+    ? objectsFromText(text, info.width, info.height, x)
+    : outlineFromText(text, info.width, info.height);
 }
 export class SegmentationService {
   constructor(
     private store: Store,
-    private provider = segmentImage,
+    private provider: (
+      image: GeneratedImage,
+      x: number,
+      y: number,
+    ) => Promise<ObjectOutline | null> = async (image, x, y) =>
+      (await segmentImage(image, x, y)) as ObjectOutline | null,
   ) {}
   async select(auth: AuthorAuth, versionId: string, x: number, y: number) {
     await requireAuthor(this.store, auth);

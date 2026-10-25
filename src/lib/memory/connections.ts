@@ -35,6 +35,8 @@ export type PublicationSnapshot = {
   createdAt: string;
 };
 export type PublicationView = PublicationSnapshot & {
+  imageOrigin?: "source" | "generated";
+  sourceImageUrl?: string;
   imageUrl: string;
   narration: NarrationView | null;
 };

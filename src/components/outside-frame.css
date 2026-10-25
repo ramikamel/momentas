@@ -1,0 +1,97 @@
+.outside-frame {
+  margin-top: 3rem;
+  padding: 2rem clamp(1rem, 4vw, 3rem);
+  background: #e9eddf;
+  border-radius: 20px;
+}
+.outside-heading h2 {
+  font:
+    clamp(2rem, 3vw, 3rem) / 1.1 Georgia,
+    serif;
+  margin: 1rem 0;
+}
+.outside-heading p {
+  max-width: 42rem;
+  color: #626c5d;
+  line-height: 1.7;
+}
+.outside-frame > label {
+  display: block;
+  font-size: 0.85rem;
+  margin: 1.5rem 0 0.6rem;
+}
+.outside-frame > textarea {
+  width: 100%;
+  border: 1px solid #c9d0be;
+  border-radius: 12px;
+  background: #fffdf7;
+  padding: 1rem;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+}
+.outside-actions {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.outside-caption {
+  font-size: 0.8rem;
+  color: #697362;
+}
+.outside-reveal {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.4rem;
+  margin-top: 2rem;
+  animation: memory-reveal 0.7s ease-out;
+}
+.outside-reveal figure {
+  margin: 0;
+  align-self: center;
+}
+.outside-reveal img {
+  width: 100%;
+  display: block;
+  border: 7px solid white;
+  box-sizing: border-box;
+  box-shadow: 0 8px 24px #25392118;
+}
+.outside-reveal figcaption {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  margin-top: 0.8rem;
+  color: #56634f;
+}
+.outside-reveal blockquote {
+  grid-column: 1/-1;
+  font:
+    1.2rem/1.6 Georgia,
+    serif;
+  margin: 0.8rem 0;
+}
+.outside-reveal > .button {
+  grid-column: 1/-1;
+  justify-self: start;
+}
+@keyframes memory-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 650px) {
+  .outside-reveal {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .outside-reveal {
+    animation: none;
+  }
+}

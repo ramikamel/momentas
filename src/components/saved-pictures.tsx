@@ -92,11 +92,13 @@ export function SavedPictures() {
                   >
                     <img
                       src={v.imageUrl}
-                      alt={`AI reconstruction of ${m.title}, saved image ${i + 1}`}
+                      alt={`${v.origin === "source" ? "Original photograph" : "AI reconstruction"} of ${m.title}, saved image ${i + 1}`}
                       loading="lazy"
                     />
                     <span>
-                      Image {i + 1}
+                      {v.origin === "source"
+                        ? "Original photograph"
+                        : `Image ${i + 1}`}
                       <span>Open picture ↗</span>
                     </span>
                   </Link>

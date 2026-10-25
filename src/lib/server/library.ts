@@ -30,6 +30,7 @@ export async function savedMemories(
             createdAt: m.createdAt,
             versions: versions.map((v) => ({
               id: v.id,
+              origin: v.origin ?? "generated",
               createdAt: v.createdAt,
               imageUrl: `/api/memories/${id}/images/${v.id}`,
             })),

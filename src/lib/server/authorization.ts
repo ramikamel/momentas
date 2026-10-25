@@ -93,5 +93,26 @@ export async function publicationView(
     void _privatePath;
     narration = { ...safe, audioUrl: await store.audioUrl(record, capability) };
   }
-  return { ...publication, imageUrl, narration };
+  const source = version.scene.outsideFrame
+    ? (await store.versions(publication.memoryId)).find(
+        (v) =>
+          v.id === version.scene.outsideFrame?.sourceVersionId &&
+          v.origin === "source" &&
+          version.parentVersionId === v.id,
+      )
+    : null;
+  const capabilityQuery = capability.comparison
+    ? `comparison=${encodeURIComponent(capability.comparison)}`
+    : capability.share
+      ? `share=${encodeURIComponent(capability.share)}`
+      : "";
+  return {
+    ...publication,
+    imageUrl,
+    narration,
+    imageOrigin: version.origin ?? "generated",
+    sourceImageUrl: source
+      ? `/api/memories/${publication.memoryId}/images/${source.id}${capabilityQuery ? "?" + capabilityQuery : ""}`
+      : undefined,
+  };
 }

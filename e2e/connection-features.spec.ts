@@ -31,23 +31,16 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   ).toBeVisible();
   await page.waitForTimeout(1400);
   await page.getByRole("button", { name: /Stop recording/ }).click();
-  await expect(
-    page.getByRole("button", { name: "Transcribe recording", exact: true }),
-  ).toBeEnabled();
-  await page
-    .getByRole("button", { name: "Transcribe recording", exact: true })
-    .click();
-  await expect(page.getByLabel("Review your transcript")).toHaveValue(
-    "Dad taught me to ride my bike in the parking lot.",
-  );
-  await page
-    .getByRole("button", { name: "Use transcript", exact: true })
-    .click();
+  await expect
+    .poll(async () =>
+      page.getByLabel("Tell it as you remember it").inputValue(),
+    )
+    .toContain("Dad taught me to ride my bike in the parking lot.");
   await page.getByRole("button", { name: "Add details", exact: true }).click();
   await page.getByRole("button", { name: "Visualize this memory" }).click();
   await expect(page.getByText("1 saved image", { exact: true })).toBeVisible();
   await page
-    .getByRole("button", { name: "＋ Add a detail", exact: true })
+    .getByRole("button", { name: "＋ Place a simple pin", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Choose a spot for your detail" })

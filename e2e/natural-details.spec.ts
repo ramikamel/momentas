@@ -19,7 +19,7 @@ test("image-first details support keyboard placement, outline fallback, cancel, 
     });
   });
   await page
-    .getByRole("button", { name: "＋ Add a detail", exact: true })
+    .getByRole("button", { name: "＋ Place a simple pin", exact: true })
     .click();
   const image = page.getByRole("button", {
     name: "Choose a spot for your detail",
@@ -29,10 +29,9 @@ test("image-first details support keyboard placement, outline fallback, cancel, 
   await image.press("Enter");
   const note = page.getByLabel("What do you remember about this?");
   await note.fill("I can still hear the bicycle bell.");
-  await expect(page.getByText("Finding the object’s outline…")).toBeVisible();
-  await page
-    .getByRole("button", { name: "Use a simple pin", exact: true })
-    .click();
+  await expect(
+    page.getByText("Your detail will use a simple pin."),
+  ).toBeVisible();
   await replyOutline?.();
   await expect(note).toHaveValue("I can still hear the bicycle bell.");
   await expect(page.locator(".conn-object-outline")).toHaveCount(0);
@@ -62,7 +61,7 @@ test("image-first details support keyboard placement, outline fallback, cancel, 
   expect(saved[0].x).toBe(0.52);
   expect(saved[0]).not.toHaveProperty("outline");
   await page
-    .getByRole("button", { name: "＋ Add a detail", exact: true })
+    .getByRole("button", { name: "＋ Place a simple pin", exact: true })
     .click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.locator(".conn-saved-notes li")).toHaveCount(1);

@@ -4,7 +4,12 @@ import type { ImageVersionView } from "@/lib/memory/types";
 import type { PinDraft, PublicPin } from "@/lib/memory/connections";
 import { DetailOutline } from "./detail-outline";
 import "./connections.css";
-type Position = { x: number; y: number };
+import "./object-details.css";
+import type { DetectedObject, ObjectMap } from "@/lib/memory/personalization";
+type Position = {
+  x: number;
+  y: number;
+};
 export function DetailPinEditor({
   memoryId,
   version,
@@ -27,6 +32,97 @@ export function DetailPinEditor({
     [outlineNotice, setOutlineNotice] = useState(""),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
+  const [objectMap, setObjectMap] = useState<ObjectMap | null>(null),
+    [objects, setObjects] = useState<DetectedObject[]>([]),
+    [concept, setConcept] = useState(""),
+    [preparing, setPreparing] = useState(true),
+    [manual, setManual] = useState(false);
+  const objectUrl = `/api/memories/${memoryId}/versions/${version.id}/objects`;
+  useEffect(() => {
+    let active = true,
+      timer: ReturnType<typeof setTimeout>;
+    async function load(prepare = false) {
+      try {
+        const response = await fetch(
+          objectUrl,
+          prepare
+            ? {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: "{}",
+              }
+            : undefined,
+        );
+        const data = await response.json();
+        if (!active) return;
+        if (!response.ok)
+          throw new Error(data.error || "Object preparation unavailable.");
+        if (!data.map && !prepare) {
+          void load(true);
+          return;
+        }
+        setObjectMap(data.map);
+        setObjects(data.map?.objects || []);
+        setPreparing(data.map?.status === "pending");
+        if (data.map?.status === "pending")
+          timer = setTimeout(() => void load(), 2000);
+      } catch {
+        if (active) {
+          setPreparing(false);
+          setOutlineNotice(
+            "Object preparation unavailable. You can place a simple pin.",
+          );
+        }
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [objectUrl]);
+  function chooseObject(object: DetectedObject) {
+    stopOutline();
+    setAdding(true);
+    setManual(false);
+    setPosition({ x: object.x, y: object.y });
+    setOutline(object.outline);
+    setOutlineNotice(
+      `Selected ${object.label}. Choose another object to change the target.`,
+    );
+    requestAnimationFrame(() => textarea.current?.focus());
+  }
+  async function findObject() {
+    if (!concept.trim() || finding) return;
+    setFinding(true);
+    try {
+      const response = await fetch(objectUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ concept }),
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Could not find this object.");
+      setObjects((current) => [
+        ...current.filter(
+          (o) => !data.objects.some((n: DetectedObject) => n.id === o.id),
+        ),
+        ...data.objects,
+      ]);
+      if (data.objects.length) chooseObject(data.objects[0]);
+      else
+        setOutlineNotice(
+          "No matching object found. Try another name or place a pin.",
+        );
+    } catch (error) {
+      setOutlineNotice(
+        error instanceof Error ? error.message : "Could not find this object.",
+      );
+    } finally {
+      setFinding(false);
+    }
+  }
   const textarea = useRef<HTMLTextAreaElement>(null),
     addButton = useRef<HTMLButtonElement>(null),
     request = useRef<AbortController | null>(null),
@@ -47,6 +143,7 @@ export function DetailPinEditor({
   function cancel() {
     stopOutline();
     setAdding(false);
+    setManual(false);
     setPosition(null);
     setText("");
     setEditing(null);
@@ -56,44 +153,12 @@ export function DetailPinEditor({
   }
   async function place(point: Position) {
     stopOutline();
-    const current = generation.current,
-      controller = new AbortController();
-    request.current = controller;
     setPosition(point);
     setCursor(point);
     setOutline(null);
-    setFinding(true);
-    setOutlineNotice("");
+    setFinding(false);
+    setOutlineNotice("Your detail will use a simple pin.");
     requestAnimationFrame(() => textarea.current?.focus());
-    try {
-      const r = await fetch(
-        `/api/memories/${memoryId}/versions/${version.id}/outline`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(point),
-          signal: controller.signal,
-        },
-      );
-      const data = await r.json();
-      if (current !== generation.current) return;
-      if (!r.ok) throw new Error(data.error || "Object outline unavailable.");
-      setOutline(data.outline);
-      setOutlineNotice(
-        data.outline
-          ? "Object outlined. If it isn’t the right object, use a simple pin or choose another spot."
-          : "No object found here. Your detail will use a simple pin.",
-      );
-    } catch (e) {
-      if (current === generation.current)
-        setOutlineNotice(
-          e instanceof Error && e.name !== "AbortError"
-            ? "Couldn’t outline this object. You can still save your note with a pin."
-            : "",
-        );
-    } finally {
-      if (current === generation.current) setFinding(false);
-    }
   }
   async function persist(next: PinDraft[]): Promise<boolean> {
     setBusy(true);
@@ -160,11 +225,12 @@ export function DetailPinEditor({
             disabled={pins.length >= 5 || busy}
             onClick={() => {
               setAdding(true);
+              setManual(true);
               setNotice("");
               setCursor({ x: 0.5, y: 0.5 });
             }}
           >
-            ＋ Add a detail
+            ＋ Place a simple pin
           </button>
         )}
         {adding && (
@@ -187,7 +253,31 @@ export function DetailPinEditor({
           draggable={false}
         />
         <DetailOutline outline={outline} />
-        {adding && (
+        {!manual && (
+          <svg
+            className="object-map-overlay"
+            viewBox="0 0 1000 1000"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {[...objects]
+              .sort((a, b) => b.area - a.area)
+              .map((object) => (
+                <path
+                  key={object.id}
+                  d={object.outline.path}
+                  className={
+                    outline?.path === object.outline.path ? "selected" : ""
+                  }
+                  onClick={() => {
+                    if (!busy && (adding || pins.length < 5))
+                      chooseObject(object);
+                  }}
+                />
+              ))}
+          </svg>
+        )}
+        {adding && manual && (
           <button
             type="button"
             className="conn-place-hit"
@@ -206,7 +296,9 @@ export function DetailPinEditor({
               });
             }}
             onKeyDown={(e) => {
-              const delta: { [key: string]: Position } = {
+              const delta: {
+                [key: string]: Position;
+              } = {
                 ArrowLeft: { x: -0.02, y: 0 },
                 ArrowRight: { x: 0.02, y: 0 },
                 ArrowUp: { x: 0, y: -0.02 },
@@ -270,6 +362,92 @@ export function DetailPinEditor({
         {!adding && (
           <span className="conn-image-credit">AI RECONSTRUCTION</span>
         )}
+      </div>
+      <div className="object-map-controls">
+        <p role="status" className="conn-small">
+          {preparing
+            ? "Preparing selectable objects…"
+            : objectMap?.status === "failed"
+              ? "Object preparation failed. Place a pin or retry."
+              : objects.length
+                ? "Choose an outlined object, then tell its story."
+                : "No objects found. Search for an object or place a pin."}
+        </p>
+        {objectMap?.status === "failed" && (
+          <button
+            type="button"
+            className="conn-link"
+            disabled={preparing}
+            onClick={async () => {
+              setPreparing(true);
+              try {
+                const r = await fetch(objectUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ retry: true }),
+                });
+                const d = await r.json();
+                if (!r.ok) throw new Error();
+                setObjectMap(d.map);
+                setObjects(d.map?.objects || []);
+              } catch {
+                setOutlineNotice(
+                  "Could not prepare objects. You can still place a pin.",
+                );
+              } finally {
+                setPreparing(false);
+              }
+            }}
+          >
+            Retry preparation
+          </button>
+        )}
+        <div className="object-map-buttons">
+          {objects.map((object, i) => (
+            <button
+              type="button"
+              className="conn-button secondary"
+              key={object.id}
+              disabled={busy || (!adding && pins.length >= 5)}
+              aria-label={`Select ${object.label}${objects.filter((o) => o.label === object.label).length > 1 ? ` ${i + 1}` : ""}`}
+              aria-pressed={outline?.path === object.outline.path}
+              onClick={() => chooseObject(object)}
+            >
+              {object.label}
+            </button>
+          ))}
+        </div>
+        <div className="object-map-search">
+          <label>
+            Find an object
+            <input
+              value={concept}
+              onChange={(e) => setConcept(e.target.value)}
+              placeholder="e.g. helmet"
+              maxLength={60}
+              disabled={busy || finding}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void findObject();
+                }
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="conn-button secondary"
+            disabled={
+              busy ||
+              finding ||
+              !concept.trim() ||
+              (!adding && pins.length >= 5)
+            }
+            onClick={() => void findObject()}
+          >
+            {finding ? "Finding…" : "Find object"}
+          </button>
+        </div>
       </div>
       {adding && !position && (
         <p className="conn-placement-hint">

@@ -1,0 +1,82 @@
+.reference-photos {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #deddd4;
+  border-radius: 14px;
+  background: #faf9f4;
+  color: #3e433b;
+}
+.reference-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.reference-photos p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0.5rem 0 0.8rem;
+}
+.reference-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.reference-list li {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+.reference-list img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.reference-list span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.reference-list small {
+  display: block;
+  font-size: 0.72rem;
+  opacity: 0.65;
+}
+.reference-photos button {
+  border: 1px solid #c8cdc1;
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  background: white;
+}
+.reference-photos button:disabled {
+  opacity: 0.55;
+}
+.reference-editor {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+.reference-editor > img {
+  max-width: 100%;
+  width: 140px;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.reference-editor label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+.reference-editor input,
+.reference-editor select {
+  padding: 0.5rem;
+  border: 1px solid #c8cdc1;
+  border-radius: 7px;
+  background: white;
+  min-width: 0;
+}
+.reference-photos [role="alert"] {
+  color: #a13926;
+}

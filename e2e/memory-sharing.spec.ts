@@ -88,7 +88,7 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
   await page.getByRole("button", { name: "Tell the memory" }).click();
   await page.getByLabel("Give this memory a title").fill("PRIVATE DRAFT TITLE");
   await page.getByRole("button", { name: "Save draft" }).click();
-  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(page.locator(".busy")).toHaveCount(0);
   await recipient.reload();
   await expect(
     recipient.getByRole("heading", { name: "The day you let go" }),

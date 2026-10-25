@@ -1,3 +1,5 @@
+import { createPhotoContextSupabaseStore } from "./photo-context-supabase-store";
+import { createSourcePhotoSupabaseStore } from "./source-photo-supabase-store";
 import { createConnectionSupabaseStore } from "./connection-supabase-store";
 import type {
   Store,
@@ -25,6 +27,7 @@ const memoryFields = {
   createdAt: "created_at",
 } as const;
 const versionFields = {
+  origin: "origin",
   id: "id",
   memoryId: "memory_id",
   parentVersionId: "parent_version_id",
@@ -112,7 +115,9 @@ export function createSupabaseStore(
   const filter = (key: string, value: string) =>
     `${key}=eq.${encodeURIComponent(value)}`;
   return {
+    ...createPhotoContextSupabaseStore(url, key),
     ...createConnectionSupabaseStore(url, key),
+    ...createSourcePhotoSupabaseStore(url, key),
     async createMemory(m) {
       await request("/rest/v1/memories", {
         method: "POST",

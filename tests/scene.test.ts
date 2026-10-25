@@ -43,7 +43,7 @@ describe("grounded scene review", () => {
         story,
         scenePlan: null,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       draftSchema.safeParse({
         title: "Bike",

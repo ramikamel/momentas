@@ -26,6 +26,10 @@ import type {
   ScenePlan,
   SourcedDetail,
 } from "@/lib/memory/types";
+import { PhotoStart } from "./photo-start";
+import { PhotoMemoryWorkspace } from "./photo-memory-workspace";
+import { OutsideFrameReveal } from "./outside-frame-reveal";
+import { ReferencePhotos } from "./reference-photos";
 import { VoiceRecorder } from "./voice-recorder";
 import { MemoryVoicePlayer } from "./memory-voice-player";
 import { DetailPinEditor, MemoryDetailPins } from "./memory-detail-pins";
@@ -131,28 +135,28 @@ function StoryFields({
 }) {
   return (
     <>
-      <Field label="Give this memory a title">
+      <Field
+        label="Give this memory a title"
+        hint="Optional. You can add this later."
+      >
         <input
           maxLength={120}
-          required
           placeholder="The day you let go"
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
         />
       </Field>
       <div className="field-grid">
-        <Field label="Your name">
+        <Field label="Your name" hint="Optional">
           <input
-            required
             maxLength={80}
             placeholder="Alex"
             value={draft.authorName}
             onChange={(e) => setDraft({ ...draft, authorName: e.target.value })}
           />
         </Field>
-        <Field label="Who is it for?">
+        <Field label="Who is it for?" hint="Optional">
           <input
-            required
             maxLength={80}
             placeholder="Dad"
             value={draft.recipientName}
@@ -197,7 +201,57 @@ export function Landing() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [createdId, setCreatedId] = useState(""),
-    [busyMessage, setBusyMessage] = useState("");
+    [busyMessage, setBusyMessage] = useState(""),
+    [captureBusy, setCaptureBusy] = useState(false),
+    [referenceBusy, setReferenceBusy] = useState(false);
+  const latestDraft = useRef(draft),
+    draftId = useRef(""),
+    draftCreation = useRef<Promise<string> | null>(null);
+  useEffect(() => {
+    latestDraft.current = draft;
+  }, [draft]);
+  async function ensureDraft() {
+    if (draftId.current) return draftId.current;
+    if (draftCreation.current) return draftCreation.current;
+    const pending = api<{ id: string }>(
+      "/api/memories",
+      latestDraft.current,
+    ).then((r) => {
+      draftId.current = r.id;
+      setCreatedId(r.id);
+      return r.id;
+    });
+    draftCreation.current = pending;
+    try {
+      return await pending;
+    } finally {
+      draftCreation.current = null;
+    }
+  }
+  function acceptVoice(value: { story: string; narrationId: string }) {
+    const current = latestDraft.current;
+    const story = [current.story.trimEnd(), value.story.trim()]
+      .filter(Boolean)
+      .join("\n\n");
+    if (story.length > 6000)
+      throw new Error(
+        "Your recording is saved. Shorten the memory to fit these new words, then retry.",
+      );
+    const next = {
+      ...current,
+      story,
+      narrationId: value.narrationId,
+      scenePlan: null,
+    };
+    latestDraft.current = next;
+    setDraft(next);
+    if (draftId.current)
+      void api(`/api/memories/${draftId.current}`, next, "PATCH").catch(() =>
+        setError(
+          "Your words are here. Submit or save this draft again to save the latest text.",
+        ),
+      );
+  }
   const generationAttempt = useRef<{ signature: string; id: string } | null>(
     null,
   );
@@ -223,9 +277,7 @@ export function Landing() {
     try {
       let id = createdId;
       if (!id) {
-        const r = await api<{ id: string }>("/api/memories", draft);
-        id = r.id;
-        setCreatedId(id);
+        id = await ensureDraft();
       } else if (generationAttempt.current?.signature !== JSON.stringify(draft))
         await api(`/api/memories/${id}`, draft, "PATCH");
       if (mode === "details") {
@@ -250,35 +302,16 @@ export function Landing() {
       setBusy(false);
     }
   }
-  async function startVoice() {
-    if (
-      !draft.title.trim() ||
-      !draft.authorName.trim() ||
-      !draft.recipientName.trim()
-    ) {
-      setError(
-        "Add a title, your name and who this memory is for, then start recording.",
-      );
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const r = await api<{ id: string }>("/api/memories", {
-        ...draft,
-        story: "",
-        scenePlan: null,
-      });
-      router.push(`/memory/${r.id}`);
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  }
   return (
     <>
       <Header />
       <main>
+        <PhotoStart
+          ensureMemory={ensureDraft}
+          onReady={(memoryId, version) =>
+            router.push(`/memory/${memoryId}?image=${version.id}`)
+          }
+        />
         <section className="hero">
           <div className="hero-copy">
             <div className="eyebrow">
@@ -355,10 +388,26 @@ export function Landing() {
             </span>
           </div>
           <form className="paper form-card" onSubmit={create}>
-            <StoryFields draft={draft} setDraft={setDraft} />
+            <fieldset disabled={busy} className="capture-fields">
+              <VoiceRecorder
+                memoryId={createdId || undefined}
+                ensureMemory={ensureDraft}
+                onUse={acceptVoice}
+                onSelect={(narrationId) =>
+                  setDraft((d) => ({ ...d, narrationId }))
+                }
+                onBusyChange={setCaptureBusy}
+              />
+              <StoryFields draft={draft} setDraft={setDraft} />
+              <ReferencePhotos
+                memoryId={createdId || undefined}
+                ensureMemory={ensureDraft}
+                onBusyChange={setReferenceBusy}
+              />
+            </fieldset>
             <ErrorNotice error={error} />
             <button
-              disabled={busy}
+              disabled={busy || captureBusy || referenceBusy}
               className="button primary wide"
               type="submit"
             >
@@ -368,7 +417,7 @@ export function Landing() {
             <button
               type="button"
               className="button subtle wide"
-              disabled={busy}
+              disabled={busy || captureBusy || referenceBusy}
               onClick={(e) => {
                 if (e.currentTarget.form?.reportValidity())
                   void createMode("details");
@@ -382,14 +431,6 @@ export function Landing() {
                 Open saved draft →
               </Link>
             )}
-            <button
-              type="button"
-              className="button subtle wide"
-              disabled={busy}
-              onClick={startVoice}
-            >
-              Start with my voice instead
-            </button>
             <p className="form-note">
               Your draft stays private. You decide when to share.
               <br />
@@ -553,7 +594,13 @@ export function Workspace({
     [includeNarration, setIncludeNarration] = useState(false),
     [shareUrl, setShareUrl] = useState(""),
     [copied, setCopied] = useState(false),
-    [reply, setReply] = useState<Record<string, string>>({});
+    [reply, setReply] = useState<Record<string, string>>({}),
+    [captureBusy, setCaptureBusy] = useState(false),
+    [referenceBusy, setReferenceBusy] = useState(false);
+  const latestDraft = useRef(draft);
+  useEffect(() => {
+    latestDraft.current = draft;
+  }, [draft]);
   const generationAttempt = useRef<{ signature: string; id: string } | null>(
     null,
   );
@@ -679,6 +726,48 @@ export function Workspace({
     );
   }
   const version = memory?.versions.find((v) => v.id === selected);
+  const source = memory?.versions.find((v) => v.origin === "source");
+  if (memory && source && stage !== 3)
+    return (
+      <>
+        <Header />
+        <PhotoMemoryWorkspace
+          memory={memory}
+          version={source}
+          onShare={async () => {
+            await load(true);
+            setSelected(source.id);
+            setStage(3);
+          }}
+          outsideFrame={
+            <OutsideFrameReveal
+              memoryId={id}
+              source={source}
+              versions={memory.versions}
+              initialVersionId={initialVersionId}
+              onGenerated={(v) =>
+                setMemory((m) =>
+                  m
+                    ? {
+                        ...m,
+                        versions: [
+                          ...m.versions.filter((x) => x.id !== v.id),
+                          v,
+                        ],
+                      }
+                    : m,
+                )
+              }
+              onShareWider={async (v) => {
+                await load(true);
+                setSelected(v.id);
+                setStage(3);
+              }}
+            />
+          }
+        />
+      </>
+    );
   return (
     <>
       <Header />
@@ -705,6 +794,8 @@ export function Workspace({
                 className={stage === i ? "active" : ""}
                 disabled={
                   !!busy ||
+                  captureBusy ||
+                  referenceBusy ||
                   !memory ||
                   (i === 1 && !draft.scenePlan) ||
                   (i > 1 && !memory?.versions.length)
@@ -781,20 +872,44 @@ export function Workspace({
                 >
                   <VoiceRecorder
                     memoryId={id}
+                    onBusyChange={setCaptureBusy}
                     onUse={(value) => {
-                      setDraft({
-                        ...draft,
-                        story: value.story,
+                      const current = latestDraft.current;
+                      const story = [
+                        current.story.trimEnd(),
+                        value.story.trim(),
+                      ]
+                        .filter(Boolean)
+                        .join("\n\n");
+                      if (story.length > 6000)
+                        throw new Error(
+                          "Your recording is saved. Shorten the memory before adding more words.",
+                        );
+                      const next = {
+                        ...current,
+                        story,
                         narrationId: value.narrationId,
                         scenePlan: null,
-                      });
+                      };
+                      latestDraft.current = next;
+                      setDraft(next);
                       setApproved(false);
+                      void api(base, next, "PATCH").catch(() =>
+                        setError(
+                          "Your words are here. Save your draft again to save the latest text.",
+                        ),
+                      );
                     }}
                     onSelect={(narrationId) =>
-                      setDraft({ ...draft, narrationId })
+                      setDraft((d) => ({ ...d, narrationId }))
                     }
                   />
                   <StoryFields draft={draft} setDraft={setDraft} />
+                  <ReferencePhotos
+                    memoryId={id}
+                    onBusyChange={setReferenceBusy}
+                    onChanged={() => load()}
+                  />
                   <div className="action-row">
                     <button
                       type="button"
@@ -806,7 +921,9 @@ export function Workspace({
                     <button
                       type="button"
                       className="button subtle"
-                      disabled={!draft.story.trim()}
+                      disabled={
+                        !draft.story.trim() || captureBusy || referenceBusy
+                      }
                       onClick={() => void extract()}
                     >
                       Add details
@@ -814,7 +931,9 @@ export function Workspace({
                     <button
                       className="button primary"
                       type="submit"
-                      disabled={!draft.story.trim()}
+                      disabled={
+                        !draft.story.trim() || captureBusy || referenceBusy
+                      }
                     >
                       Submit & generate image <ArrowRight size={17} />
                     </button>
@@ -1010,7 +1129,9 @@ export function Workspace({
                         </span>
                         <h2>{draft.title}</h2>
                         <p>
-                          An AI memory reconstruction, shaped by{" "}
+                          {version.origin === "source"
+                            ? "An original photograph, with stories from "
+                            : "An AI reconstruction from recollections by "}
                           {draft.authorName}.
                         </p>
                       </div>
@@ -1227,14 +1348,20 @@ export function SharedMemory({ token }: { token: string }) {
               </div>
               <h1>{memory.title}</h1>
               <p>
-                AI reconstruction · Shaped by {memory.authorName}, not an
-                original photograph.
+                {memory.imageOrigin === "source"
+                  ? `An original photograph · Stories from ${memory.authorName}`
+                  : `AI reconstruction from ${memory.authorName}’s recollection`}
+                .
               </p>
             </div>
             <div className="shared-image">
               <MemoryDetailPins
-                imageUrl={memory.imageUrl}
-                alt={memory.imageDescription || memory.title}
+                imageUrl={memory.sourceImageUrl || memory.imageUrl}
+                alt={
+                  memory.sourceImageUrl
+                    ? "Original photograph, unchanged"
+                    : memory.imageDescription || memory.title
+                }
                 pins={memory.pins ?? []}
                 onAsk={(pin) => {
                   setSelectedPin(pin);
@@ -1244,6 +1371,19 @@ export function SharedMemory({ token }: { token: string }) {
                 }}
               />
             </div>
+            {memory.sourceImageUrl && (
+              <figure className="shared-image">
+                <img
+                  src={memory.imageUrl}
+                  alt="AI reconstruction from the storyteller’s recollection"
+                  style={{ width: "100%" }}
+                />
+                <figcaption className="form-note">
+                  AI reconstruction from their recollection · The original
+                  photograph above remains unchanged.
+                </figcaption>
+              </figure>
+            )}
             {memory.narration && (
               <MemoryVoicePlayer narration={memory.narration} />
             )}

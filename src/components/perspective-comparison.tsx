@@ -136,12 +136,19 @@ export function PerspectiveComparison({ token }: { token: string }) {
                   key={p.id}
                 >
                   <span className="conn-eyebrow">
-                    {p.authorName}’s perspective · AI reconstruction
+                    {p.authorName}’s perspective ·{" "}
+                    {p.imageOrigin === "source"
+                      ? "Original photograph"
+                      : "AI reconstruction"}
                   </span>
                   <h2>{p.title}</h2>
                   <MemoryDetailPins
-                    imageUrl={p.imageUrl}
-                    alt={`AI reconstruction of ${p.authorName}'s memory`}
+                    imageUrl={p.sourceImageUrl || p.imageUrl}
+                    alt={
+                      p.imageOrigin === "source" || p.sourceImageUrl
+                        ? `Original photograph shared by ${p.authorName}`
+                        : `AI reconstruction of ${p.authorName}'s memory`
+                    }
                     pins={p.pins}
                     onAsk={(detail) => {
                       setSide(which);
@@ -151,6 +158,18 @@ export function PerspectiveComparison({ token }: { token: string }) {
                         ?.scrollIntoView({ behavior: "smooth" });
                     }}
                   />
+                  {p.sourceImageUrl && (
+                    <figure>
+                      <img
+                        style={{ width: "100%" }}
+                        src={p.imageUrl}
+                        alt="AI reconstruction from their recollection"
+                      />
+                      <figcaption className="conn-small">
+                        AI reconstruction from their recollection
+                      </figcaption>
+                    </figure>
+                  )}
                   <p>“{p.caption}”</p>
                   {p.narration && <MemoryVoicePlayer narration={p.narration} />}
                 </article>

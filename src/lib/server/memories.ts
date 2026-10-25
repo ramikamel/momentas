@@ -94,6 +94,15 @@ export class MemoryService {
     }));
     return {
       id: m.id,
+      references: (await this.store.references(id)).map(
+        ({ imagePath: _, ...r }) => {
+          void _;
+          return {
+            ...r,
+            imageUrl: `/api/memories/${id}/references/${r.id}/image`,
+          };
+        },
+      ),
       title: m.title,
       authorName: m.authorName,
       recipientName: m.recipientName,
@@ -164,6 +173,16 @@ export class MemoryService {
       : null;
     if (input.baseVersionId && !base)
       throw new AppError("The selected image was not found.", 404, "NOT_FOUND");
+    if (
+      input.scene.outsideFrame &&
+      (!base ||
+        base.origin !== "source" ||
+        input.scene.outsideFrame.sourceVersionId !== base.id)
+    )
+      throw new AppError(
+        "Choose the original photograph for this reconstruction.",
+        400,
+      );
     const reservation = await this.store.reserveRender(
       id,
       input.requestId,
@@ -244,13 +263,26 @@ export class MemoryService {
   ): Promise<ImageVersionView> {
     let uploadedPath: string | null = null;
     try {
+      const references = await this.store.references(id);
+      const referenceImages = await Promise.all(
+        references.map(async (r) => ({
+          ...(await this.store.readImage(r.imagePath)),
+          label: r.label,
+          kind: r.kind,
+        })),
+      );
+      const scene = {
+        ...input.scene,
+        referenceIds: references.map((r) => r.id),
+      };
       const image = base
         ? await this.ai.editImage(
             await this.store.readImage(base.imagePath),
-            input.scene,
+            scene,
             input.instruction!,
+            referenceImages,
           )
-        : await this.ai.generateImage(input.scene);
+        : await this.ai.generateImage(scene, referenceImages);
       validateGeneratedImage(image);
       const versionId = randomUUID(),
         extension =
@@ -264,7 +296,7 @@ export class MemoryService {
         memoryId: id,
         parentVersionId: base?.id || null,
         imagePath: `${id}/${versionId}.${extension}`,
-        scene: input.scene,
+        scene,
         instruction: input.instruction,
         createdAt: new Date().toISOString(),
       };
@@ -296,6 +328,29 @@ export class MemoryService {
     const input = publishSchema.parse({ versionId, caption });
     if (!(await this.store.versions(id)).some((v) => v.id === input.versionId))
       throw new AppError("Choose an image from this memory.", 404, "NOT_FOUND");
+    const chosen = (await this.store.versions(id)).find(
+      (v) => v.id === input.versionId,
+    )!;
+    if (chosen.scene.outsideFrame) {
+      const source = (await this.store.versions(id)).find(
+        (v) =>
+          v.id === chosen.scene.outsideFrame!.sourceVersionId &&
+          v.origin === "source" &&
+          chosen.parentVersionId === v.id,
+      );
+      if (!source)
+        throw new AppError(
+          "This reconstruction has no original photograph.",
+          400,
+        );
+      // Freeze committed source-relative notes into this selected publication version.
+      // Recipient renders them on the unchanged source companion, never on invented pixels.
+      await this.store.saveVersionPins(
+        id,
+        chosen.id,
+        await this.store.getVersionPins(id, source.id),
+      );
+    }
     const shareToken = shareTokenFor(token, id);
     await this.store.publishSnapshot(id, {
       versionId: input.versionId,
@@ -318,7 +373,17 @@ export class MemoryService {
     const view = p
       ? await publicationView(this.store, p, { share: token })
       : null;
+    const sourceId = version.scene.outsideFrame?.sourceVersionId;
+    const source = sourceId
+      ? (await this.store.versions(m.id)).find(
+          (v) => v.id === sourceId && v.origin === "source",
+        )
+      : null;
     return {
+      imageOrigin: version.origin ?? "generated",
+      sourceImageUrl: source
+        ? `/api/memories/${m.id}/images/${source.id}?share=${encodeURIComponent(token)}`
+        : undefined,
       publicationId: p?.id,
       pins: p?.pins ?? [],
       narration: view?.narration ?? null,
@@ -333,7 +398,10 @@ export class MemoryService {
         version.id,
         token,
       ),
-      imageDescription: `AI reconstruction of ${m.publishedTitle}, shaped by its storyteller.`,
+      imageDescription:
+        version.origin === "source"
+          ? `Original photograph: ${m.publishedTitle}.`
+          : `AI reconstruction of ${m.publishedTitle}, shaped by its storyteller.`,
       messages: (await this.store.messages(m.id)).map((message) => ({
         ...message,
         pinContext:
@@ -430,11 +498,40 @@ export class MemoryService {
         this.store.getPublication(link.originalPublicationId),
         this.store.getPublication(link.contributionPublicationId!),
       ]);
-      if (!pubs.some((p) => p?.memoryId === id && p.versionId === versionId))
+      const ownVersions = await this.store.versions(id);
+      if (
+        !pubs.some(
+          (p) =>
+            p?.memoryId === id &&
+            (p.versionId === versionId ||
+              (ownVersions.some(
+                (v) =>
+                  v.id === p.versionId &&
+                  v.scene.outsideFrame?.sourceVersionId === versionId &&
+                  v.parentVersionId === versionId,
+              ) &&
+                ownVersions.some(
+                  (v) => v.id === versionId && v.origin === "source",
+                ))),
+        )
+      )
         throw new AppError("This image is not shared.", 403);
     } else if (shareToken) {
       const m = await this.requireShared(shareToken);
-      if (m.id !== id || m.publishedVersionId !== versionId)
+      const published = (await this.store.versions(m.id)).find(
+        (v) => v.id === m.publishedVersionId,
+      );
+      const companionCandidate = published?.scene.outsideFrame?.sourceVersionId;
+      const companion = (await this.store.versions(m.id)).find(
+        (v) =>
+          v.id === companionCandidate &&
+          v.origin === "source" &&
+          published?.parentVersionId === v.id,
+      )?.id;
+      if (
+        m.id !== id ||
+        (m.publishedVersionId !== versionId && companion !== versionId)
+      )
         throw new AppError("This image is not shared.", 403, "IMAGE_DENIED");
     } else await this.requireAuthor(id, authorToken);
     const version = (await this.store.versions(id)).find(

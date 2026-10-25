@@ -1,3 +1,9 @@
+import { createPhotoContextLocalStore } from "./photo-context-local-store";
+import {
+  createSourcePhotoLocalStore,
+  type SourceState,
+} from "./source-photo-local-store";
+import type { MemoryReference, ObjectMap } from "../memory/personalization";
 import { normalizePins } from "../memory/pins";
 import type {
   PublicationSnapshot,
@@ -23,7 +29,12 @@ import type {
   MemoryMessage,
   RenderRequest,
 } from "../memory/types";
-type State = {
+type State = SourceState & {
+  references?: MemoryReference[];
+  objectMaps?: Record<
+    string,
+    ObjectMap & { requestId: string; expiresAt: number }
+  >;
   outlineRequests?: {
     id: string;
     memoryId: string;
@@ -147,6 +158,125 @@ export function createLocalStore(directory: string): Store {
     );
   }
   return {
+    ...createPhotoContextLocalStore(transaction),
+    ...createSourcePhotoLocalStore(transaction, (path) =>
+      imagePath(path, "sources"),
+    ),
+    references: (mid) =>
+      transaction((s) => {
+        memory(s, mid);
+        return (s.references ?? []).filter((r) => r.memoryId === mid);
+      }, false),
+    saveReference: (ref) =>
+      transaction((s) => {
+        memory(s, ref.memoryId);
+        const refs = (s.references ??= []);
+        const own = refs.filter((r) => r.memoryId === ref.memoryId);
+        if (own.length >= 4) error("Up to four reference photos", 400);
+        if (own.some((r) => r.label.toLowerCase() === ref.label.toLowerCase()))
+          error("Choose a unique photo name", 400);
+        refs.push(structuredClone(ref));
+      }),
+    deleteReference: (mid, rid) =>
+      transaction((s) => {
+        memory(s, mid);
+        s.references = (s.references ?? []).filter(
+          (r) => !(r.id === rid && r.memoryId === mid),
+        );
+      }),
+    getObjectMap: (mid, vid) =>
+      transaction((s) => {
+        ownVersion(s, vid, mid);
+        const map = s.objectMaps?.[vid];
+        if (!map) return null;
+        const { requestId: _id, expiresAt: _expiry, ...view } = map;
+        void _id;
+        void _expiry;
+        return {
+          ...view,
+          status:
+            map.status === "pending" && map.expiresAt <= Date.now()
+              ? "failed"
+              : map.status,
+        };
+      }, false),
+    claimObjectMap: (mid, vid, rid, retry) =>
+      transaction((s) => {
+        ownVersion(s, vid, mid);
+        const maps = (s.objectMaps ??= {});
+        let map = maps[vid];
+        if (map?.status === "pending" && map.expiresAt <= Date.now())
+          map.status = "failed";
+        if (map && (map.status !== "failed" || !retry)) {
+          const { requestId: _id, expiresAt: _expiry, ...view } = map;
+          void _id;
+          void _expiry;
+          return { claimed: false, map: view };
+        }
+        map = {
+          memoryId: mid,
+          versionId: vid,
+          status: "pending",
+          objects: [],
+          updatedAt: new Date().toISOString(),
+          requestId: rid,
+          expiresAt: Date.now() + 180000,
+        };
+        maps[vid] = map;
+        const { requestId: _id, expiresAt: _expiry, ...view } = map;
+        void _id;
+        void _expiry;
+        return { claimed: true, map: view };
+      }),
+    saveObjectMap: (mid, vid, rid, objects, status) =>
+      transaction((s) => {
+        ownVersion(s, vid, mid);
+        const map = s.objectMaps?.[vid];
+        if (
+          !map ||
+          map.memoryId !== mid ||
+          map.requestId !== rid ||
+          map.status !== "pending"
+        )
+          error("Object map changed", 409);
+        map!.objects = structuredClone(objects);
+        map!.status = status;
+        map!.updatedAt = new Date().toISOString();
+      }),
+    reserveOutlineBatch: (mid, vid, ids) =>
+      transaction((s) => {
+        ownVersion(s, vid, mid);
+        const requests = (s.outlineRequests ??= []);
+        if (
+          ids.length < 1 ||
+          ids.length > 6 ||
+          new Set(ids).size !== ids.length ||
+          ids.some((id) => requests.some((r) => r.id === id))
+        )
+          error("Invalid outline batch", 400);
+        if (
+          requests.length + ids.length > 120 ||
+          requests.filter((r) => r.versionId === vid).length + ids.length > 20
+        )
+          error("Outline request cap reached", 429);
+        if (
+          requests.some(
+            (r) =>
+              r.versionId === vid &&
+              r.status === "pending" &&
+              r.expiresAt > Date.now(),
+          )
+        )
+          error("Outline already pending", 409);
+        for (const id of ids)
+          requests.push({
+            id,
+            memoryId: mid,
+            versionId: vid,
+            status: "pending",
+            expiresAt: Date.now() + 180000,
+          });
+      }),
     reserveDetailOutline: (mid, vid, rid) =>
       transaction((s) => {
         ownVersion(s, vid, mid);

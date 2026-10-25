@@ -1,0 +1,251 @@
+.photo-start {
+  padding: 2.4rem;
+  border: 1px solid #dfd9c9;
+  background: #f8f2e7;
+  border-radius: 24px;
+  margin: 1.5rem 0;
+}
+.photo-start h2 {
+  font-family: Georgia, serif;
+  font-size: 2.3rem;
+  margin: 0.7rem 0;
+}
+.photo-start p {
+  max-width: 35rem;
+  color: #5b6258;
+}
+.photo-start small {
+  display: block;
+  margin-top: 1rem;
+  color: #6a7167;
+}
+.photo-workspace {
+  max-width: 1480px;
+  margin: auto;
+  padding: 2rem 4vw 4rem;
+  background: #f8f6ef;
+  color: #28382f;
+}
+.photo-heading {
+  padding: 1rem 0 2rem;
+}
+.photo-heading a {
+  display: block;
+  margin-bottom: 2rem;
+  color: #5b675c;
+  font-size: 0.85rem;
+}
+.photo-heading h1 {
+  font:
+    clamp(2.3rem, 4vw, 4rem) / 1.1 Georgia,
+    serif;
+  margin: 0.8rem 0;
+}
+.photo-heading p {
+  color: #697165;
+}
+.photo-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(310px, 1fr);
+  gap: 2.2rem;
+  align-items: start;
+}
+.photo-stage {
+  min-width: 0;
+}
+.photo-canvas {
+  position: relative;
+  border: 12px solid white;
+  box-shadow: 0 10px 35px #28382f14;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.photo-canvas img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.photo-canvas svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.photo-canvas path {
+  pointer-events: all;
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 3;
+  cursor: pointer;
+  transition: fill 0.15s;
+}
+.photo-canvas path:hover,
+.photo-canvas path.selected {
+  fill: #f8d68830;
+  stroke: #fff3cf;
+}
+.photo-canvas.is-placing {
+  cursor: crosshair;
+}
+.photo-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  background: #fff6d8;
+  border: 2px solid white;
+  color: #394b37;
+  box-shadow: 0 1px 8px #0003;
+  z-index: 2;
+}
+.photo-dot.selected {
+  background: #d9ac64;
+}
+.photo-caption {
+  font-size: 0.8rem;
+  color: #717769;
+  margin: 1rem 0.3rem;
+}
+.photo-objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.photo-objects button,
+.photo-story nav button,
+.photo-prompts button,
+.photo-find button {
+  border: 1px solid #d5d8c9;
+  border-radius: 20px;
+  padding: 0.5rem 0.9rem;
+  background: #fffdf6;
+  color: #384d3d;
+}
+.photo-find {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1.2rem 0;
+}
+.photo-find input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid #c8ccbd;
+  background: transparent;
+  padding: 0.7rem;
+  font-size: 0.85rem;
+}
+.photo-story {
+  background: #fffdf7;
+  border: 1px solid #e8e5d8;
+  border-radius: 20px;
+  padding: 1.6rem;
+}
+.photo-story nav {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.8rem;
+}
+.photo-story nav button[aria-pressed="true"] {
+  background: #e4eacf;
+  border-color: #b8c39d;
+}
+.photo-story h2 {
+  font:
+    1.8rem/1.2 Georgia,
+    serif;
+  margin: 0.8rem 0 1.3rem;
+}
+.photo-composer label {
+  display: block;
+  font-size: 0.8rem;
+  margin: 1rem 0 0.6rem;
+  color: #626e5e;
+}
+.photo-composer textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid #d9dccd;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fffefb;
+  font: 1rem/1.6 inherit;
+}
+.photo-composer > .button {
+  margin-top: 1rem;
+}
+.photo-prompts {
+  border-top: 1px solid #e6e6d9;
+  padding-top: 1.2rem;
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+.photo-prompts button {
+  margin: 0.3rem;
+}
+.photo-share {
+  margin-top: 1.5rem;
+  width: 100%;
+}
+.photo-reference {
+  margin-top: 2.5rem;
+  border-top: 1px solid #dfe1d3;
+  padding: 1.5rem 0;
+}
+.photo-reference summary {
+  cursor: pointer;
+}
+.photo-reference summary span {
+  color: #79806e;
+  font-size: 0.8rem;
+  margin-left: 1rem;
+}
+.photo-workspace button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.photo-workspace button:focus-visible,
+.photo-workspace input:focus-visible,
+.photo-workspace textarea:focus-visible {
+  outline: 3px solid #b48c4c;
+  outline-offset: 3px;
+}
+@media (max-width: 850px) {
+  .photo-layout {
+    grid-template-columns: 1fr;
+  }
+  .photo-workspace {
+    padding: 1rem 5vw 3rem;
+  }
+  .photo-story {
+    padding: 1.3rem;
+  }
+  .photo-heading a {
+    margin-bottom: 1.2rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-canvas path {
+    transition: none;
+  }
+}
+.photo-recording {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.photo-canvas path {
+  stroke: #fff3cf55;
+  stroke-width: 2;
+  stroke-dasharray: 5 6;
+}
+.photo-canvas path:hover,
+.photo-canvas path.selected {
+  stroke-dasharray: none;
+  stroke-width: 3;
+}

@@ -1,3 +1,6 @@
+import type { PhotoContextStore } from "./photo-context";
+import type { SourcePhotoStore } from "./source-photo";
+import type { PersonalizationStore, ReferenceView } from "./personalization";
 import type {
   ConnectionStore,
   NarrationView,
@@ -15,6 +18,12 @@ export type ScenePlan = {
   followUpQuestions: string[];
 };
 export type ApprovedScene = {
+  outsideFrame?: {
+    sourceVersionId: string;
+    mode: "wider-reconstruction";
+    recollection: string;
+  };
+  referenceIds?: string[];
   plan: ScenePlan;
   authorAdditions: string;
   confirmed: true;
@@ -28,6 +37,7 @@ export type DraftInput = {
   scenePlan: ScenePlan | null;
 };
 export type ImageVersion = {
+  origin?: "source" | "generated";
   id: string;
   memoryId: string;
   parentVersionId: string | null;
@@ -71,6 +81,7 @@ export type MemoryRecord = DraftInput & {
 };
 export type ImageVersionView = ImageVersion & { imageUrl: string };
 export type AuthorMemoryView = DraftInput & {
+  references?: ReferenceView[];
   currentPublicationId?: string | null;
   narrationId?: string | null;
   narrations?: NarrationView[];
@@ -93,6 +104,8 @@ export type AuthorMemoryView = DraftInput & {
   shareUrl: string | null;
 };
 export type PublishedMemoryView = {
+  sourceImageUrl?: string;
+  imageOrigin?: "source" | "generated";
   publicationId?: string;
   pins?: PublicPin[];
   narration?: NarrationView | null;
@@ -116,42 +129,45 @@ export type RenderRequest = {
 export type RenderReservation =
   | { kind: "reserved" }
   | { kind: "completed"; version: ImageVersion };
-export type Store = ConnectionStore & {
-  createMemory(memory: MemoryRecord): Promise<void>;
-  getMemory(id: string): Promise<MemoryRecord | null>;
-  updateMemory(id: string, update: Partial<MemoryRecord>): Promise<void>;
-  findShared(hash: string): Promise<MemoryRecord | null>;
-  versions(memoryId: string): Promise<ImageVersion[]>;
-  messages(memoryId: string): Promise<MemoryMessage[]>;
-  addMessage(
-    message: MemoryMessage,
-    expectedPublishedVersion?: string,
-  ): Promise<void>;
-  getRenderRequest(
-    memoryId: string,
-    requestId: string,
-  ): Promise<RenderRequest | null>;
-  reserveRender(
-    memoryId: string,
-    requestId: string,
-    cap: number | null,
-  ): Promise<RenderReservation>;
-  completeRender(
-    memoryId: string,
-    requestId: string,
-    version: ImageVersion,
-  ): Promise<void>;
-  failRender(memoryId: string, requestId: string): Promise<void>;
-  putImage(path: string, image: GeneratedImage): Promise<void>;
-  readImage(path: string): Promise<GeneratedImage>;
-  removeImage(path: string): Promise<void>;
-  imageUrl(
-    path: string,
-    memoryId: string,
-    versionId: string,
-    shareToken?: string,
-  ): Promise<string>;
-};
+export type Store = PhotoContextStore &
+  SourcePhotoStore &
+  ConnectionStore &
+  PersonalizationStore & {
+    createMemory(memory: MemoryRecord): Promise<void>;
+    getMemory(id: string): Promise<MemoryRecord | null>;
+    updateMemory(id: string, update: Partial<MemoryRecord>): Promise<void>;
+    findShared(hash: string): Promise<MemoryRecord | null>;
+    versions(memoryId: string): Promise<ImageVersion[]>;
+    messages(memoryId: string): Promise<MemoryMessage[]>;
+    addMessage(
+      message: MemoryMessage,
+      expectedPublishedVersion?: string,
+    ): Promise<void>;
+    getRenderRequest(
+      memoryId: string,
+      requestId: string,
+    ): Promise<RenderRequest | null>;
+    reserveRender(
+      memoryId: string,
+      requestId: string,
+      cap: number | null,
+    ): Promise<RenderReservation>;
+    completeRender(
+      memoryId: string,
+      requestId: string,
+      version: ImageVersion,
+    ): Promise<void>;
+    failRender(memoryId: string, requestId: string): Promise<void>;
+    putImage(path: string, image: GeneratedImage): Promise<void>;
+    readImage(path: string): Promise<GeneratedImage>;
+    removeImage(path: string): Promise<void>;
+    imageUrl(
+      path: string,
+      memoryId: string,
+      versionId: string,
+      shareToken?: string,
+    ): Promise<string>;
+  };
 
 export type SavedMemory = {
   id: string;
@@ -159,5 +175,10 @@ export type SavedMemory = {
   authorName: string;
   recipientName: string;
   createdAt: string;
-  versions: { id: string; imageUrl: string; createdAt: string }[];
+  versions: {
+    id: string;
+    imageUrl: string;
+    createdAt: string;
+    origin?: "source" | "generated";
+  }[];
 };

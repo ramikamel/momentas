@@ -1,0 +1,64 @@
+.object-map-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+.object-map-overlay path {
+  pointer-events: visiblePainted;
+  fill: rgba(250, 220, 130, 0.045);
+  stroke: rgba(255, 239, 187, 0.8);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+}
+.object-map-overlay path:hover,
+.object-map-overlay path.selected {
+  fill: rgba(250, 210, 100, 0.22);
+  stroke: #ffe09c;
+  stroke-width: 3;
+}
+.object-map-controls {
+  padding: 12px 0;
+}
+.object-map-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.object-map-buttons button[aria-pressed="true"] {
+  outline: 2px solid #b78845;
+}
+.object-map-search {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.object-map-search label {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+}
+.object-map-search input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #c6bcae;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.object-map-search button {
+  flex-shrink: 0;
+}
+.conn-natural-editor .conn-pin {
+  z-index: 3;
+}
+.conn-natural-editor .conn-place-hit {
+  z-index: 2;
+}
+.conn-natural-editor .conn-object-outline {
+  z-index: 2;
+}
