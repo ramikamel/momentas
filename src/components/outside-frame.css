@@ -57,7 +57,7 @@
 }
 .outside-prompt {
   padding: 30px;
-  background: #e9eddf;
+  background: #e9eef0;
   border-radius: 14px;
   min-width: 0;
 }
@@ -66,19 +66,19 @@
   margin: 14px 0 18px;
 }
 .outside-prompt > p {
-  color: #68735f;
+  color: #526875;
   font-size: 14px;
   line-height: 1.75;
 }
 .outside-prompt label {
   display: block;
   font-size: 12px;
-  color: #536149;
+  color: #365468;
   margin: 24px 0 10px;
 }
 .outside-prompt textarea {
   width: 100%;
-  border: 1px solid #c9d0be;
+  border: 1px solid #bdcdd3;
   border-radius: 9px;
   background: #fffdf7;
   padding: 14px;
@@ -214,4 +214,9 @@
   .outside-generated {
     animation: none;
   }
+}
+
+.frame-intro .eyebrow {
+  letter-spacing: 0;
+  font-size: 12px;
 }

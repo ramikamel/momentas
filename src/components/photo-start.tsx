@@ -86,10 +86,10 @@ export function PhotoStart({
     <section className="photo-start" aria-label="Start from a photograph">
       <div className="entry-photo-art" aria-hidden="true">
         <img src="/sample-memory.webp" alt="" />
-        <span className="entry-photo-edge">THERE’S MORE BEYOND THE EDGES</span>
+        <span className="entry-photo-edge">There’s more beyond the edges</span>
       </div>
       <div className="entry-card-copy">
-        <span className="eyebrow">START WITH A PHOTOGRAPH</span>
+        <span className="eyebrow">Start with a photograph</span>
         <h2>Go beyond the frame.</h2>
         <p>
           Bring a photograph and describe what the camera missed. See your

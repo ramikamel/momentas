@@ -61,11 +61,9 @@ export class ReferenceService {
     const label = typeof labelInput === "string" ? labelInput.trim() : "";
     if (!label || label.length > 80)
       throw new AppError("Name this photo using 1–80 characters.");
-    if (
-      kindInput !== "person" &&
-      kindInput !== "place" &&
-      kindInput !== "object"
-    )
+    // Legacy storage requires a category; new uploads only need an image and name.
+    const kind = kindInput == null ? "object" : kindInput;
+    if (kind !== "person" && kind !== "place" && kind !== "object")
       throw new AppError("Choose person, place, or object.");
     if (
       !(file instanceof File) ||
@@ -115,7 +113,7 @@ export class ReferenceService {
       id,
       memoryId: auth.memoryId,
       label,
-      kind: kindInput,
+      kind,
       imagePath: `${auth.memoryId}/references/${id}.webp`,
       createdAt: new Date().toISOString(),
     };

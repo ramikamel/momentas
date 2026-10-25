@@ -134,3 +134,17 @@ it("bounds multipart bytes even when content length is absent", async () => {
   });
   await expect(referenceForm(request)).rejects.toMatchObject({ status: 413 });
 });
+
+it("accepts a named image without asking the user to classify it", async () => {
+  const store = fake();
+  const result = await new ReferenceService(store as unknown as Store).upload(
+    auth,
+    await photo(),
+    " Our kitchen ",
+    null,
+  );
+  expect(result.label).toBe("Our kitchen");
+  expect(store.saveReference).toHaveBeenCalledWith(
+    expect.objectContaining({ label: "Our kitchen" }),
+  );
+});

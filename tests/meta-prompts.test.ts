@@ -103,5 +103,6 @@ it.each(["generate", "edit"] as const)(
       `"inputImage":${operation === "generate" ? 1 : 2},"name":"Dad"`,
     );
     expect(payload!.prompt).toContain("Our kitchen");
+    expect(payload!.prompt).not.toContain('"kind":');
   },
 );

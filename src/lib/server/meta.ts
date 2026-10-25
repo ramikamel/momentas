@@ -132,7 +132,6 @@ export function referenceImagePrompt(
   const labels = references.map((r, i) => ({
     inputImage: i + (hasBase ? 2 : 1),
     name: r.label,
-    kind: r.kind,
   }));
   return (
     buildImagePrompt(scene, instruction) +

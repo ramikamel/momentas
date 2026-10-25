@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { ImagePlus, X } from "lucide-react";
 import type { ReferenceView } from "@/lib/memory/personalization";
 import "./reference-photos.css";
 type Props = {
@@ -50,14 +51,17 @@ export function ReferencePhotos({
   const [items, setItems] = useState<ReferenceView[]>([]),
     [photo, setPhoto] = useState<Blob | null>(null);
   const [preview, setPreview] = useState(""),
-    [label, setLabel] = useState(""),
-    [kind, setKind] = useState("person");
+    [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [status, setStatus] = useState("");
+  const nameId = useId();
+  const nameInput = useRef<HTMLInputElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    onBusyChange?.(busy);
+    onBusyChange?.(busy || !!photo);
     return () => onBusyChange?.(false);
-  }, [busy, onBusyChange]);
+  }, [busy, photo, onBusyChange]);
   const input = useRef<HTMLInputElement>(null);
   const selection = useRef(0);
   const mutations = useRef(0);
@@ -94,10 +98,27 @@ export function ReferencePhotos({
     },
     [],
   );
+  useEffect(() => {
+    if (preview) nameInput.current?.focus();
+  }, [preview]);
+  function cancel() {
+    selection.current++;
+    setPhoto(null);
+    setLabel("");
+    setError("");
+    if (input.current) input.current.value = "";
+    uploadButton.current?.focus();
+  }
+  const uploadButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!busy && !photo && status)
+      (uploadButton.current ?? heading.current)?.focus();
+  }, [busy, photo, status]);
   async function choose(file?: File) {
     if (!file) return;
     const sequence = ++selection.current;
     setError("");
+    setStatus("");
     setBusy(true);
     setPhoto(null);
     try {
@@ -121,7 +142,6 @@ export function ReferencePhotos({
       const body = new FormData();
       body.set("photo", photo, "reference.webp");
       body.set("label", label.trim());
-      body.set("kind", kind);
       const response = await fetch(`/api/memories/${target}/references`, {
         method: "POST",
         body,
@@ -134,6 +154,7 @@ export function ReferencePhotos({
         data,
       ]);
       setPhoto(null);
+      setStatus(`Added ${data.label}. Mention this name in your memory.`);
       setLabel("");
       if (input.current) input.current.value = "";
       await onChanged?.();
@@ -156,6 +177,7 @@ export function ReferencePhotos({
       if (!response.ok) throw new Error(data.error);
       mutations.current++;
       setItems((current) => current.filter((item) => item.id !== referenceId));
+      setStatus("Image removed.");
       await onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not remove photo.");
@@ -164,94 +186,113 @@ export function ReferencePhotos({
     }
   }
   return (
-    <section className="reference-photos" aria-label="Reference photos">
+    <section
+      className="reference-photos"
+      aria-label="Reference photos"
+      aria-busy={busy}
+    >
       <div className="reference-heading">
-        <strong>Familiar faces and places</strong>
-        <span>{items.length}/4</span>
+        <div>
+          <h3 ref={heading} tabIndex={-1}>
+            Pictures to remember by
+          </h3>
+          <p>Name a picture, then mention it in your memory.</p>
+        </div>
+        {items.length < 4 && (
+          <button
+            ref={uploadButton}
+            className="reference-upload"
+            type="button"
+            disabled={busy}
+            onClick={() => input.current?.click()}
+          >
+            <ImagePlus size={18} aria-hidden="true" />
+            {busy ? "Please wait…" : photo ? "Change image" : "Upload image"}
+          </button>
+        )}
       </div>
-      <p>
-        Add private photos to help the image resemble the people, places, and
-        objects in your memory.
-      </p>
-      {items.length > 0 && (
-        <ul className="reference-list">
-          {items.map((item) => (
-            <li key={item.id}>
-              {/* Private owner-only URLs cannot use the public image optimizer. */}
-              <img src={item.imageUrl} alt={item.label} />
-              <span>
-                {item.label}
-                <small>{item.kind}</small>
-              </span>
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        aria-label="Upload a reference image"
+        hidden
+        onChange={(e) => void choose(e.target.files?.[0])}
+      />
+      {photo && (
+        <div className="reference-editor">
+          <div className="reference-preview">
+            {preview && <img src={preview} alt="Selected image" />}
+          </div>
+          <div className="reference-name">
+            <label htmlFor={nameId}>What should we call this?</label>
+            <input
+              ref={nameInput}
+              id={nameId}
+              value={label}
+              maxLength={80}
+              placeholder="Dad, our kitchen, my red bike…"
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void save();
+                }
+              }}
+              disabled={busy}
+            />
+            <div className="reference-editor-actions">
               <button
+                className="reference-save"
+                type="button"
+                onClick={() => void save()}
+                disabled={busy || !label.trim()}
+              >
+                {busy ? "Adding…" : "Add image"}
+              </button>
+              <button
+                className="reference-cancel"
                 type="button"
                 disabled={busy}
-                onClick={() => remove(item.id)}
+                onClick={cancel}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {items.length > 0 && (
+        <ul className="reference-list" aria-label="Added images">
+          {items.map((item) => (
+            <li key={item.id}>
+              <img src={item.imageUrl} alt={item.label} />
+              <span className="reference-label">{item.label}</span>
+              <button
+                className="reference-remove"
+                type="button"
+                disabled={busy}
+                onClick={() => void remove(item.id)}
                 aria-label={`Remove ${item.label}`}
               >
-                Remove
+                <X size={16} aria-hidden="true" />
               </button>
             </li>
           ))}
         </ul>
       )}
-      {items.length < 4 && (
-        <>
-          <input
-            ref={input}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            hidden
-            onChange={(e) => void choose(e.target.files?.[0])}
-          />
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => input.current?.click()}
-          >
-            {busy
-              ? "Preparing…"
-              : photo
-                ? "Choose another photo"
-                : "Add reference photo"}
-          </button>
-          {photo && (
-            <div className="reference-editor">
-              <img src={preview} alt="Photo ready to name" />
-              <label>
-                Name this photo
-                <input
-                  value={label}
-                  maxLength={80}
-                  placeholder="Dad / Our kitchen"
-                  onChange={(e) => setLabel(e.target.value)}
-                  disabled={busy}
-                />
-              </label>
-              <label>
-                What is it?
-                <select
-                  value={kind}
-                  onChange={(e) => setKind(e.target.value)}
-                  disabled={busy}
-                >
-                  <option value="person">Person</option>
-                  <option value="place">Place</option>
-                  <option value="object">Object</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={save}
-                disabled={busy || !label.trim()}
-              >
-                Save photo
-              </button>
-            </div>
-          )}
-        </>
+      <div className="reference-footer">
+        <span>These pictures stay private.</span>
+        <span>{items.length} of 4 added</span>
+      </div>
+      <p className="reference-status" role="status">
+        {status}
+      </p>
+      {error && (
+        <p className="reference-error" role="alert">
+          {error}
+        </p>
       )}
-      {error && <p role="alert">{error}</p>}
     </section>
   );
 }

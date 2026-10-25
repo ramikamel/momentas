@@ -316,7 +316,7 @@ export function Landing() {
       <main>
         <section className="entry-home" id="choose">
           <header className="entry-heading">
-            <div className="eyebrow">FOR THE MOMENTS THAT STAY</div>
+            <div className="eyebrow">For the moments that stay</div>
             <h1>
               Every memory has <em>more to it.</em>
             </h1>
@@ -340,10 +340,10 @@ export function Landing() {
                   <br />
                   <em>like it was yesterday.”</em>
                 </p>
-                <span>THE THINGS A CAMERA COULDN’T KEEP</span>
+                <span>The things a camera couldn’t keep</span>
               </div>
               <div className="entry-card-copy">
-                <span className="eyebrow">START WITH YOUR WORDS</span>
+                <span className="eyebrow">Start with your words</span>
                 <h2>Bring a memory to life.</h2>
                 <p>
                   No photograph? Tell the moment as you remember it, and turn
@@ -367,7 +367,7 @@ export function Landing() {
           <>
             <section className="begin-section" id="begin">
               <div className="begin-intro">
-                <div className="eyebrow">A PLACE TO BEGIN</div>
+                <div className="eyebrow">A place to begin</div>
                 <h2>
                   What takes you
                   <br /> <em>back?</em>

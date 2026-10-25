@@ -25,7 +25,7 @@ export function PhotoFrameWorkspace({
         ← Your saved pictures
       </Link>
       <header className="frame-intro">
-        <span className="eyebrow">A PHOTOGRAPH IS ONLY THE BEGINNING</span>
+        <span className="eyebrow">A photograph is only the beginning</span>
         <h1>
           See outside the <em>frame.</em>
         </h1>
