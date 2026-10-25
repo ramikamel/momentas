@@ -6,6 +6,8 @@ export type PublicPin = {
   y: number;
   label: string;
   sourceQuote: string;
+  origin?: "author";
+  outline?: { path: string };
 };
 export type PinDraft = PublicPin & { detailPath: string };
 export type NarrationRecord = {
@@ -81,6 +83,17 @@ export type ConnectionRequest = {
   createdAt: string;
 };
 export interface ConnectionStore {
+  reserveDetailOutline(
+    memoryId: string,
+    versionId: string,
+    requestId: string,
+  ): Promise<void>;
+  finishDetailOutline(
+    memoryId: string,
+    versionId: string,
+    requestId: string,
+    success: boolean,
+  ): Promise<void>;
   publishSnapshot(
     memoryId: string,
     input: {

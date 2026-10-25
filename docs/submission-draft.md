@@ -16,7 +16,7 @@ Muse Spark creates an editable scene with verbatim source quotes. Muse Image gen
 
 Built with Next.js, React, TypeScript, Tailwind, Supabase Postgres/private Storage, Muse Spark and Muse Image. Codex assisted implementation, testing and review. State the actual coding model/harness in the final form if requested. Voice capture and editable transcription use Muse Voice Transcribe.
 
-Demonstrated scope: recorded or written memories, image refinement and retained versions, selected quote pins, unlisted sharing, independent second perspectives, an evidence-linked comparison reveal, and contextual questions with human replies. The presenter can play both sample roles in separate browsers. Generated image represents a subjective interpretation; the sample is fictional and labeled.
+Demonstrated scope: recorded or written memories, image refinement and retained versions, click-to-add notes and SAM object outlines, unlisted sharing, independent second perspectives, an evidence-linked comparison reveal, and contextual questions with human replies. The presenter can play both sample roles in separate browsers. Generated image represents a subjective interpretation; the sample is fictional and labeled.
 
 Before submitting, insert the verified deployed URL and final narrated demo-video link, add a repository link if created, and review the event's official rules and submission form. No submission or terms acceptance has been performed automatically.
 

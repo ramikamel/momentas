@@ -1,3 +1,5 @@
+import { normalizePins } from "../memory/pins";
+import type { ApprovedScene } from "../memory/types";
 import type {
   ConnectionStore,
   PublicationSnapshot,
@@ -60,6 +62,27 @@ export function createConnectionSupabaseStore(
     return p.split("/").map(encodeURIComponent).join("/");
   };
   return {
+    reserveDetailOutline: async (memoryId, versionId, requestId) => {
+      await req("/rest/v1/rpc/reserve_detail_outline", {
+        method: "POST",
+        body: JSON.stringify({
+          p_memory_id: memoryId,
+          p_version_id: versionId,
+          p_request_id: requestId,
+        }),
+      });
+    },
+    finishDetailOutline: async (memoryId, versionId, requestId, success) => {
+      await req("/rest/v1/rpc/finish_detail_outline", {
+        method: "POST",
+        body: JSON.stringify({
+          p_memory_id: memoryId,
+          p_version_id: versionId,
+          p_request_id: requestId,
+          p_success: success,
+        }),
+      });
+    },
     publishSnapshot: (memoryId, input) =>
       action("publish", { memoryId, ...input }),
     getPublication: (id) =>
@@ -71,7 +94,27 @@ export function createConnectionSupabaseStore(
       return (rows[0]?.pins ?? []) as PinDraft[];
     },
     saveVersionPins: async (memoryId, versionId, pins) => {
-      await action("pins", { memoryId, versionId, pins });
+      // Server-only table: validate the saved version and full pin payload here.
+      // The legacy RPC only accepts extracted quotes; notes share the same JSON
+      // storage and publication transaction without requiring schema changes.
+      const versions = await req(
+        `/rest/v1/memory_versions?memory_id=eq.${encodeURIComponent(memoryId)}&id=eq.${encodeURIComponent(versionId)}&select=scene&limit=1`,
+      );
+      if (!versions[0])
+        throw Object.assign(new Error("Image not found"), { status: 404 });
+      const validated = normalizePins(versions[0].scene as ApprovedScene, pins);
+      await req(
+        "/rest/v1/memory_version_pins?on_conflict=memory_id,version_id",
+        {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({
+            memory_id: memoryId,
+            version_id: versionId,
+            pins: validated,
+          }),
+        },
+      );
     },
     saveNarration: async (narration) => {
       await action("narration", { narration });

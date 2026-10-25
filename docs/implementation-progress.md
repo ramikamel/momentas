@@ -73,3 +73,14 @@ The fictional showcase has two distinct real Muse images (existing child view an
 - Final primary-main verification: 43 tests in 12 files passed; lint and TypeScript passed. The three full browser journeys and the webpack production bundle passed before release; the remote production build also passed.
 - Showcase: https://www.momentas.tech/compare/Mb93rbSsERGc7wjm_DIyOqVd2k0CiFI1qeQK7-v39BQ . This is a clearly labeled fictional example with real Muse images and grounded insights; it has no recorded narrator voices.
 - Hosted screenshots are preserved locally under output/connection-features/hosted; private capabilities, fixture audio, configuration and artifacts remain ignored.
+
+
+## Natural image details update
+
+Replaced the hidden annotation disclosure, duplicate preview, extracted-detail selector and quote-copy field with a visible Add a detail button on the generated image. Click/tap or keyboard placement opens a free note composer; Save detail persists immediately, with edit/remove/cancel and recoverable save errors. Existing quote pins and immutable published comparisons remain compatible. New author notes are labeled as storyteller additions.
+
+Added real SAM 3.1 point-prompt segmentation on the owner’s stored image using the existing Meta key. The official parser decodes masks; bounded simplified SVG contours stay aligned on responsive images. A note can be saved as a simple pin if outlining fails, is cancelled, or selects the wrong object. Requests use the owner’s saved bytes, no arbitrary external image URL, bounded image size, response size and timeout.
+
+Review found process-local outline quotas insufficient and a stale keyboard marker; both were fixed. Additive migration 003 reserves paid outline attempts atomically (20/version, 120/project, failed attempts count, one pending per version with 120-second expiry). Missing migration fails closed for paid calls and preserves plain-pin note saving. The user was asked to apply this via SQL Editor because the service-role API cannot change schema. Local PostgreSQL-compatible checks passed all migrations, ownership, anonymous denial, pending/duplicate protection, failure counting and cap enforcement.
+
+Verification: 53 unit/integration tests and four browser journeys passed, including new note publication/question/reply, cancellation of delayed outlines, retry without text loss, keyboard placement and removal. Lint/TypeScript passed. Real SAM selected and outlined the fictional father in 9.5 seconds; inspected desktop/mobile screenshots show the actual contour. Real Supabase note and contour save/read passed; the fictional sample’s draft pins were restored. Final reviewer reported no remaining important findings. Production release verification follows.

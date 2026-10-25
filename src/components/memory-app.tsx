@@ -788,32 +788,13 @@ export function Workspace({ id }: { id: string }) {
                   <p>Keep what feels true. Change what doesn’t.</p>
                 </div>
                 {version && (
-                  <div className="image-frame">
-                    <img
-                      src={version.imageUrl}
-                      alt={`AI reconstruction of ${draft.title}, version ${memory.versions.findIndex((v) => v.id === selected) + 1}`}
-                    />
-                    <span className="image-label">
-                      AI RECONSTRUCTION{" "}
-                      {String(
-                        memory.versions.findIndex((v) => v.id === selected) + 1,
-                      ).padStart(2, "0")}
-                    </span>
-                  </div>
-                )}
-                {version && (
-                  <details className="conn-editor">
-                    <summary>Add details someone can discover</summary>
-                    <DetailPinEditor
-                      key={version.id}
-                      memoryId={id}
-                      version={version}
-                      initialPins={memory.pinsByVersion?.[version.id] ?? []}
-                      onSaved={() => {
-                        void load();
-                      }}
-                    />
-                  </details>
+                  <DetailPinEditor
+                    key={version.id}
+                    memoryId={id}
+                    version={version}
+                    initialPins={memory.pinsByVersion?.[version.id] ?? []}
+                    onSaved={() => { void load(); }}
+                  />
                 )}
                 <div className="version-bar">
                   <span>

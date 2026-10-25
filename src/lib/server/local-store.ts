@@ -1,3 +1,4 @@
+import { normalizePins } from "../memory/pins";
 import type {
   PublicationSnapshot,
   NarrationRecord,
@@ -23,6 +24,13 @@ import type {
   RenderRequest,
 } from "../memory/types";
 type State = {
+  outlineRequests?: {
+    id: string;
+    memoryId: string;
+    versionId: string;
+    status: "pending" | "complete" | "failed";
+    expiresAt: number;
+  }[];
   publications: PublicationSnapshot[];
   narrations: NarrationRecord[];
   pins: Record<string, PinDraft[]>;
@@ -139,6 +147,45 @@ export function createLocalStore(directory: string): Store {
     );
   }
   return {
+    reserveDetailOutline: (mid, vid, rid) =>
+      transaction((s) => {
+        ownVersion(s, vid, mid);
+        const requests = (s.outlineRequests ??= []);
+        if (requests.some((r) => r.id === rid))
+          error("Outline request already used", 409);
+        if (
+          requests.length >= 120 ||
+          requests.filter((r) => r.versionId === vid).length >= 20
+        )
+          error("Outline request cap reached", 429);
+        if (
+          requests.some(
+            (r) =>
+              r.versionId === vid &&
+              r.status === "pending" &&
+              r.expiresAt > Date.now(),
+          )
+        )
+          error("Outline already pending", 409);
+        requests.push({
+          id: rid,
+          memoryId: mid,
+          versionId: vid,
+          status: "pending",
+          expiresAt: Date.now() + 120000,
+        });
+      }),
+    finishDetailOutline: (mid, vid, rid, success) =>
+      transaction((s) => {
+        const r = s.outlineRequests?.find(
+          (r) =>
+            r.id === rid &&
+            r.memoryId === mid &&
+            r.versionId === vid &&
+            r.status === "pending",
+        );
+        if (r) r.status = success ? "complete" : "failed";
+      }),
     publishSnapshot: (mid, input) =>
       transaction((s) => {
         const m = memory(s, mid);
@@ -158,12 +205,14 @@ export function createLocalStore(directory: string): Store {
           recipientName: m.recipientName,
           caption: input.caption,
           pins: (s.pins[`${mid}/${input.versionId}`] ?? []).map(
-            ({ id, x, y, label, sourceQuote }) => ({
+            ({ id, x, y, label, sourceQuote, origin, outline }) => ({
               id,
               x,
               y,
               label,
               sourceQuote,
+              ...(origin ? { origin } : {}),
+              ...(outline ? { outline } : {}),
             }),
           ),
           narrationId: n?.id ?? null,
@@ -196,36 +245,13 @@ export function createLocalStore(directory: string): Store {
           new Set(pins.map((p) => p.id)).size !== pins.length
         )
           error("Invalid pins", 400);
-        for (const p of pins) {
-          const parts = p.detailPath
-            .replace(/^plan\./, "")
-            .replace(/\[(\d+)\]/g, ".$1")
-            .split(".");
-          let detail: unknown = v.scene.plan;
-          for (const part of parts)
-            detail =
-              detail && typeof detail === "object"
-                ? (detail as Record<string, unknown>)[part]
-                : undefined;
-          const d = detail as
-            | { text?: string; sourceQuote?: string }
-            | undefined;
-          if (
-            !p.id ||
-            !Number.isFinite(p.x) ||
-            !Number.isFinite(p.y) ||
-            p.x < 0 ||
-            p.x > 1 ||
-            p.y < 0 ||
-            p.y > 1 ||
-            !p.sourceQuote ||
-            p.sourceQuote.length > 500 ||
-            d?.text !== p.label ||
-            !d?.sourceQuote?.includes(p.sourceQuote)
-          )
-            error("Invalid sourced pin", 400);
+        let validated: PinDraft[];
+        try {
+          validated = normalizePins(v.scene, pins);
+        } catch {
+          error("Invalid pin", 400);
         }
-        s.pins[`${mid}/${vid}`] = structuredClone(pins);
+        s.pins[`${mid}/${vid}`] = structuredClone(validated!);
       }),
     saveNarration: (n) =>
       transaction((s) => {

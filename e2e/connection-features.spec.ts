@@ -46,15 +46,24 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   await page.getByRole("button", { name: "Visualize this memory" }).click();
   await expect(page.getByText("1 saved image", { exact: true })).toBeVisible();
   await page
-    .getByText("Add details someone can discover", { exact: true })
+    .getByRole("button", { name: "＋ Add a detail", exact: true })
     .click();
-  await page.getByLabel("Exact excerpt to share").fill("parking lot");
   await page
-    .getByRole("button", { name: "Add detail (0/5)", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Save details", exact: true }).click();
+    .getByRole("button", { name: "Choose a spot for your detail" })
+    .click({ position: { x: 80, y: 50 } });
+  await page
+    .getByLabel("What do you remember about this?")
+    .fill("This is where Dad let go of my bicycle.");
+  await page.getByRole("button", { name: "Save detail", exact: true }).click();
   await expect(
-    page.getByText("Details saved. Publish this version to share them."),
+    page.getByText("Detail saved. Publish this image to share it."),
+  ).toBeVisible();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Shape the image", exact: false })
+    .click();
+  await expect(
+    page.getByText("This is where Dad let go of my bicycle.", { exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Share this image", exact: true })
@@ -210,9 +219,11 @@ test("microphone denial preserves typed words and leaves the text flow available
   await page
     .getByRole("button", { name: "Record my memory", exact: true })
     .click();
-  await expect(page.getByRole("alert").filter({hasText:"Microphone access was unavailable"})).toContainText(
-    "Microphone access was unavailable",
-  );
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Microphone access was unavailable" }),
+  ).toContainText("Microphone access was unavailable");
   await expect(page.getByLabel("Tell it as you remember it")).toHaveValue(
     words,
   );

@@ -55,7 +55,7 @@ test("snapshots freeze pins and reject a same-image stale message", async () => 
   const s = await fixture();
   await s.saveVersionPins("m", "v", [
     {
-      id: "pin",
+      id: "84fd9444-a1cc-4001-84be-19cdc355ad07",
       x: 0,
       y: 1,
       label: "Park",
@@ -98,7 +98,7 @@ test("snapshots freeze pins and reject a same-image stale message", async () => 
 test("pins require version ownership, coordinates and exact sourced excerpts", async () => {
   const s = await fixture();
   const pin = {
-    id: "p",
+    id: "84fd9444-a1cc-4001-84be-19cdc355ad08",
     x: NaN,
     y: 0,
     label: "Park",
@@ -146,4 +146,51 @@ test("voice reservations serialize, consume quota after failure and complete ato
   await expect(
     s.reserveConnectionRequest("voice", "n", "q3", 2),
   ).rejects.toBeTruthy();
+});
+
+test("new notes and outlines survive publication without becoming transcript quotes", async () => {
+  const s = await fixture();
+  const note = {
+    id: "84fd9444-a1cc-4001-84be-19cdc355ad09",
+    x: 0.4,
+    y: 0.5,
+    detailPath: "note",
+    label: "ignored",
+    sourceQuote: "My dad painted this bicycle.",
+    origin: "author" as const,
+    outline: { path: "M100,100L200,100L200,200Z" },
+  };
+  await s.saveVersionPins("m", "v", [note]);
+  const p = await s.publishSnapshot("m", {
+    versionId: "v",
+    caption: "Ride",
+    includeNarration: false,
+    shareTokenHash: "share",
+  });
+  expect(p.pins[0]).toMatchObject({
+    sourceQuote: note.sourceQuote,
+    origin: "author",
+    outline: note.outline,
+  });
+  expect(p.pins[0]).not.toHaveProperty("detailPath");
+  await s.saveVersionPins("m", "v", []);
+  expect((await s.getPublication(p.id))?.pins[0].outline).toEqual(note.outline);
+});
+test("outline reservations serialize across store instances and consume failed attempts", async () => {
+  const s = await fixture();
+  await s.reserveDetailOutline("m", "v", "outline1");
+  await expect(
+    s.reserveDetailOutline("m", "v", "outline2"),
+  ).rejects.toMatchObject({ status: 409 });
+  await s.finishDetailOutline("m", "v", "outline1", false);
+  for (let i = 2; i <= 20; i++) {
+    await s.reserveDetailOutline("m", "v", "outline" + i);
+    await s.finishDetailOutline("m", "v", "outline" + i, false);
+  }
+  await expect(s.reserveDetailOutline("m", "v", "over")).rejects.toMatchObject({
+    status: 429,
+  });
+  await expect(
+    s.reserveDetailOutline("m", "foreign", "x"),
+  ).rejects.toMatchObject({ status: 404 });
 });

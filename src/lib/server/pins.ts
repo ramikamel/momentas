@@ -16,7 +16,7 @@ export class PinService {
       pins = normalizePins(version.scene, raw);
     } catch {
       throw new AppError(
-        "Choose up to five reviewed details, exact quote excerpts, and positions on this image.",
+        "Add up to five details with a note of 1–500 characters and a position on this image.",
         400,
         "INVALID_PINS",
       );

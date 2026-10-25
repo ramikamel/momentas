@@ -34,7 +34,7 @@ Use two browser contexts and clearly state that you are playing both fictional r
 
 - 0:00–0:20: “We can describe what happened. What is harder to share is what stayed with each of us.”
 - 0:20–0:45: Record a short account, show the reviewed transcript, and explain that the recorded voice is shared only by choice.
-- 0:45–1:10: Show the prepared camera-like scene and open a pin: “The parking lot felt enormous to me.” The words are a selected, approved excerpt.
+- 0:45–1:10: Show the prepared camera-like scene, press Add a detail, click a person or object, and write a brief note. Then open a saved pin: “The parking lot felt enormous to me.” The words are a selected, approved excerpt.
 - 1:10–1:45: Open the second person's separate account and reveal both perspectives. The child remembers Dad far behind; Dad remembers watching the child ride away. Show one useful AI observation and its source quotations.
 - 1:45–2:20: Ask a question on a pin. In the author context type a real sample reply, wait for it to save, then refresh the comparison. Emphasize that the reply comes from the person, not the model.
 - 2:20–2:45: Explain Muse Voice transcription, Spark's structured extraction/comparison, Muse Image's photographic rendering, and immutable approved snapshots in Supabase.

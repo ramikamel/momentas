@@ -13,6 +13,7 @@
     "check:meta": "tsx scripts/check-meta.ts"
   },
   "dependencies": {
+    "@meta-sam/parser": "0.1.0",
     "@supabase/supabase-js": "2.118.0",
     "@tailwindcss/postcss": "4.3.3",
     "lucide-react": "1.61.0",
@@ -20,6 +21,7 @@
     "openai": "7.43.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "sharp": "0.35.5",
     "tailwindcss": "4.3.3",
     "zod": "4.6.7"
   },
