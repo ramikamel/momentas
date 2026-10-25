@@ -575,10 +575,15 @@ function MessageList({
 export function Workspace({
   id,
   initialVersionId,
+  initialStage,
+  publishedView = false,
 }: {
   id: string;
   initialVersionId?: string;
+  initialStage?: number;
+  publishedView?: boolean;
 }) {
+  const router = useRouter();
   const [memory, setMemory] = useState<AuthorMemoryView | null>(null),
     [draft, setDraft] = useState<DraftInput>(empty),
     [stage, setStage] = useState(0),
@@ -618,15 +623,22 @@ export function Workspace({
             scenePlan: m.scenePlan,
           });
           const chosen =
-            m.versions.find((v) => v.id === initialVersionId) ||
-            m.versions.at(-1);
+            m.versions.find(
+              (v) =>
+                v.id ===
+                (publishedView ? m.publishedVersionId : initialVersionId),
+            ) || m.versions.at(-1);
           setSelected(chosen?.id || "");
           setApproved(
             !!m.scenePlan &&
               JSON.stringify(m.scenePlan) ===
                 JSON.stringify(chosen?.scene.plan),
           );
-          setStage(m.versions.length ? 2 : m.scenePlan ? 1 : 0);
+          setStage(
+            publishedView
+              ? 3
+              : (initialStage ?? (m.versions.length ? 2 : m.scenePlan ? 1 : 0)),
+          );
           setCaption(m.publishedCaption || "");
           setShareUrl(m.shareUrl || "");
           setAdditions(chosen?.scene.authorAdditions || "");
@@ -639,7 +651,7 @@ export function Workspace({
         setError((e as Error).message);
       }
     },
-    [base, initialVersionId],
+    [base, initialVersionId, initialStage, publishedView],
   );
   useEffect(() => {
     void load(true);
@@ -725,7 +737,10 @@ export function Workspace({
   }
   const version = memory?.versions.find((v) => v.id === selected);
   const source = memory?.versions.find((v) => v.origin === "source");
-  if (memory && source && stage !== 3)
+  const publishedVersion = memory?.versions.find(
+    (v) => v.id === memory.publishedVersionId,
+  );
+  if (memory && source && stage !== 3 && !publishedView)
     return (
       <>
         <Header />
@@ -783,7 +798,11 @@ export function Workspace({
                   (i === 1 && !draft.scenePlan) ||
                   (i > 1 && !memory?.versions.length)
                 }
-                onClick={() => setStage(i)}
+                onClick={() =>
+                  publishedView
+                    ? router.push(`/memory/${id}?step=${i}`)
+                    : setStage(i)
+                }
                 key={s}
               >
                 <span>
@@ -840,6 +859,144 @@ export function Workspace({
                     : "Finding your saved words and images."}
                 </p>
               </div>
+            ) : publishedView ? (
+              memory.currentPublicationId && shareUrl ? (
+                <>
+                  <div className="published-heading">
+                    <span className="published-check" aria-hidden="true">
+                      <CheckCheck size={26} />
+                    </span>
+                    <div>
+                      <p className="published-status" role="status">
+                        Published
+                      </p>
+                      <h1>Your memory is published.</h1>
+                    </div>
+                  </div>
+                  <div className="published-layout">
+                    <figure className="published-photo">
+                      {publishedVersion && (
+                        <img
+                          src={publishedVersion.imageUrl}
+                          alt="Published memory"
+                        />
+                      )}
+                      <figcaption>{memory.publishedCaption}</figcaption>
+                    </figure>
+                    <section
+                      className="published-sharing"
+                      aria-label="Share your published memory"
+                    >
+                      <h2>Share this moment.</h2>
+                      <div className="share-result">
+                        <div className="copy-row">
+                          <input
+                            readOnly
+                            aria-label="Share link"
+                            value={shareUrl}
+                          />
+                          <button
+                            aria-label="Copy share link"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(
+                                  new URL(shareUrl, window.location.origin)
+                                    .href,
+                                );
+                                setCopied(true);
+                              } catch {
+                                setError(
+                                  "Copy the link from the field to share it.",
+                                );
+                              }
+                            }}
+                          >
+                            {copied ? <Check size={18} /> : <Copy size={18} />}
+                          </button>
+                        </div>
+                        <Link
+                          className="quiet-link"
+                          href={shareUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open the recipient view <ArrowUpRight size={15} />
+                        </Link>
+                      </div>
+
+                      <PerspectiveControls
+                        memory={memory}
+                        onRefresh={() => load()}
+                      />
+                      <Link
+                        className="published-edit"
+                        href={`/memory/${id}?step=3`}
+                      >
+                        Edit shared memory
+                      </Link>
+                    </section>
+                  </div>
+                  <section className="conversation">
+                    <div className="conversation-heading">
+                      <div>
+                        <div className="eyebrow">
+                          THE CONVERSATION CONTINUES
+                        </div>
+                        <h2>What this brings back.</h2>
+                      </div>
+                      <button
+                        className="button subtle"
+                        onClick={() =>
+                          run("Refreshing the conversation", () => load())
+                        }
+                      >
+                        <RefreshCw size={15} /> Refresh
+                      </button>
+                    </div>
+                    <p className="muted small">
+                      Questions and replies come from real people. Refresh to
+                      see new messages.
+                    </p>
+                    {memory.messages.length ? (
+                      <MessageList
+                        messages={memory.messages}
+                        versions={memory.versions}
+                        reply={reply}
+                        onReply={(parentId, text) => {
+                          if (text !== undefined) {
+                            setReply({ ...reply, [parentId]: text });
+                            return;
+                          }
+                          void run("Sending your reply", async () => {
+                            await api(`${base}/reply`, {
+                              parentId,
+                              text: reply[parentId],
+                            });
+                            setReply({ ...reply, [parentId]: "" });
+                            await load();
+                          });
+                        }}
+                      />
+                    ) : (
+                      <div className="conversation-empty">
+                        <MessageCircle size={25} />
+                        <p>Every memory can begin a conversation.</p>
+                        <span>Share your link and invite a question.</span>
+                      </div>
+                    )}
+                  </section>
+                </>
+              ) : (
+                <div className="page-heading">
+                  <h1>This memory is not published yet.</h1>
+                  <Link
+                    className="button primary"
+                    href={`/memory/${id}?step=3`}
+                  >
+                    Finish publishing
+                  </Link>
+                </div>
+              )
             ) : stage === 0 ? (
               <>
                 <div className="page-heading">
@@ -1173,7 +1330,7 @@ export function Workspace({
                             { versionId: selected, caption, includeNarration },
                           );
                           setShareUrl(r.shareUrl);
-                          await load();
+                          router.push(`/memory/${id}/published`);
                         })
                       }
                     >
@@ -1183,95 +1340,15 @@ export function Workspace({
                       <ArrowUpRight size={17} />
                     </button>
                     {shareUrl && (
-                      <div className="share-result">
-                        <span className="success">
-                          <CheckCheck size={16} /> Your memory is ready to share
-                        </span>
-                        <div className="copy-row">
-                          <input
-                            readOnly
-                            aria-label="Share link"
-                            value={shareUrl}
-                          />
-                          <button
-                            aria-label="Copy share link"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(
-                                  new URL(shareUrl, window.location.origin)
-                                    .href,
-                                );
-                                setCopied(true);
-                              } catch {
-                                setError(
-                                  "Copy the link from the field to share it.",
-                                );
-                              }
-                            }}
-                          >
-                            {copied ? <Check size={18} /> : <Copy size={18} />}
-                          </button>
-                        </div>
-                        <Link
-                          className="quiet-link"
-                          href={shareUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Open the recipient view <ArrowUpRight size={15} />
-                        </Link>
-                      </div>
+                      <Link
+                        className="quiet-link"
+                        href={`/memory/${id}/published`}
+                      >
+                        View published memory
+                      </Link>
                     )}
                   </div>
                 </div>
-                <PerspectiveControls memory={memory} onRefresh={() => load()} />
-                <section className="conversation">
-                  <div className="conversation-heading">
-                    <div>
-                      <div className="eyebrow">THE CONVERSATION CONTINUES</div>
-                      <h2>What this brings back.</h2>
-                    </div>
-                    <button
-                      className="button subtle"
-                      onClick={() =>
-                        run("Refreshing the conversation", () => load())
-                      }
-                    >
-                      <RefreshCw size={15} /> Refresh
-                    </button>
-                  </div>
-                  <p className="muted small">
-                    Questions and replies come from real people. Refresh to see
-                    new messages.
-                  </p>
-                  {memory.messages.length ? (
-                    <MessageList
-                      messages={memory.messages}
-                      versions={memory.versions}
-                      reply={reply}
-                      onReply={(parentId, text) => {
-                        if (text !== undefined) {
-                          setReply({ ...reply, [parentId]: text });
-                          return;
-                        }
-                        void run("Sending your reply", async () => {
-                          await api(`${base}/reply`, {
-                            parentId,
-                            text: reply[parentId],
-                          });
-                          setReply({ ...reply, [parentId]: "" });
-                          await load();
-                        });
-                      }}
-                    />
-                  ) : (
-                    <div className="conversation-empty">
-                      <MessageCircle size={25} />
-                      <p>Every memory can begin a conversation.</p>
-                      <span>Share your link and invite a question.</span>
-                    </div>
-                  )}
-                </section>
               </>
             )}
           </fieldset>

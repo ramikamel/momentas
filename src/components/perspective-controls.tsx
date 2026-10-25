@@ -9,8 +9,7 @@ export function PerspectiveControls({
   memory: AuthorMemoryView;
   onRefresh: () => Promise<void>;
 }) {
-  const [label, setLabel] = useState("The afternoon we learned to ride"),
-    [busy, setBusy] = useState(false),
+  const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [copied, setCopied] = useState(false);
   const p = memory.perspective;
@@ -32,43 +31,24 @@ export function PerspectiveControls({
       setBusy(false);
     }
   }
+  if (!memory.currentPublicationId) return null;
   return (
     <section className="conn-perspective-controls">
-      <span className="conn-eyebrow">Same moment, two memories</span>
-      <h3>
-        {p?.role === "contributor"
-          ? "Let your perspectives meet."
-          : "How do they remember it?"}
-      </h3>
       {!p ? (
         <>
-          <p className="conn-muted">
-            Invite one person to tell their own account before seeing yours.
-            Your current published version becomes your side of the comparison.
-          </p>
-          <label className="conn-field">
-            A neutral name for the shared event
-            <input
-              maxLength={120}
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-          </label>
           <button
             type="button"
             className="conn-button"
-            disabled={busy || !memory.currentPublicationId || !label.trim()}
-            onClick={() => act("", { eventLabel: label })}
+            disabled={busy || !memory.currentPublicationId}
+            onClick={() => act("", { eventLabel: "A shared memory" })}
           >
             Invite another perspective
           </button>
         </>
       ) : (
         <>
-          <p className="conn-muted">{p.eventLabel}</p>
           {p.role === "original" && p.inviteUrl && (
             <>
-              <p>Share this invitation with the person who was there.</p>
               <div className="conn-copy">
                 {typeof window !== "undefined"
                   ? new URL(p.inviteUrl, window.location.origin).href

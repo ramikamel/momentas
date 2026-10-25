@@ -76,7 +76,10 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
     .getByRole("button", { name: "Invite another perspective", exact: true })
     .click();
   await expect(
-    page.getByText("Share this invitation with the person who was there."),
+    page.getByRole("button", {
+      name: "Copy perspective invitation",
+      exact: true,
+    }),
   ).toBeVisible();
   const state = await (await page.request.get(`/api/memories/${mid}`)).json();
   const invite = state.perspective.inviteUrl,
