@@ -394,3 +394,7 @@
 @keyframes conn-pulse { 50% { box-shadow:0 0 0 8px #f7db9b55; } }
 @media (prefers-reduced-motion:reduce) { .conn-target.is-finding { animation:none; } }
 @media (max-width:600px) { .conn-detail-toolbar { flex-wrap:wrap; gap:12px; } .conn-detail-toolbar > div { width:100%; } .conn-note-composer { padding-left:14px; padding-right:14px; } .conn-note-meta { gap:12px; } }
+
+.conn-header { gap:24px; align-items:center; }
+.conn-header .conn-library-link { font-family:inherit; font-size:13px; white-space:nowrap; color:#9b533e; }
+@media(max-width:700px) { .conn-header > span { display:none; } }

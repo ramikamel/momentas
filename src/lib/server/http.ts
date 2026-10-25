@@ -64,7 +64,7 @@ export async function handle(
       403: "This action is not available from this link.",
       404: "This memory or image was not found.",
       409: "This memory changed or a request is already in progress. Refresh and try again; your written input is preserved.",
-      429: "The image request limit has been reached. Your saved images are still available.",
+      429: "The service is busy. Please try again in a moment. Your saved work is safe.",
     };
     if (status && messages[status])
       return jsonResponse(

@@ -17,3 +17,18 @@ describe("Supabase configuration", () => {
     );
   });
 });
+
+it("removes the old demo cap using the existing RPC while retaining atomic reservations", async () => {
+  const fetcher = vi.fn(async () => Response.json({ kind: "reserved" }));
+  vi.stubGlobal("fetch", fetcher);
+  await createSupabaseStore(
+    "https://example.supabase.co",
+    "test-key",
+  ).reserveRender("memory", "request", null);
+  const [url, options] = fetcher.mock.calls[0] as unknown as [
+    string,
+    RequestInit,
+  ];
+  expect(url).toContain("/rpc/reserve_render");
+  expect(JSON.parse(String(options.body)).p_cap).toBe(2147483647);
+});

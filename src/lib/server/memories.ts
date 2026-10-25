@@ -164,11 +164,10 @@ export class MemoryService {
       : null;
     if (input.baseVersionId && !base)
       throw new AppError("The selected image was not found.", 404, "NOT_FOUND");
-    const cap = Number(process.env.MAX_IMAGE_REQUESTS || "24");
     const reservation = await this.store.reserveRender(
       id,
       input.requestId,
-      Number.isInteger(cap) && cap > 0 ? cap : 24,
+      null,
     );
     if (reservation.kind === "completed") {
       const v = reservation.version;
@@ -177,6 +176,72 @@ export class MemoryService {
         imageUrl: await this.store.imageUrl(v.imagePath, id, v.id),
       };
     }
+    return this.produceVersion(id, input, base ?? null);
+  }
+  async generateFromStory(
+    id: string,
+    token: string,
+    requestId: string,
+  ): Promise<ImageVersionView> {
+    const memory = await this.requireAuthor(id, token);
+    z.uuid().parse(requestId);
+    z.string().trim().min(1).max(6000).parse(memory.story);
+    this.checkAi();
+    const prior = await this.store.getRenderRequest(id, requestId);
+    if (
+      prior?.status === "failed" ||
+      (prior?.status === "pending" && Date.parse(prior.expiresAt) <= Date.now())
+    ) {
+      await this.store.failRender(id, requestId).catch(() => {});
+      throw new AppError(
+        "The previous attempt ended before an image was saved. Submit again to retry.",
+        409,
+        "GENERATION_FAILED",
+      );
+    }
+    if (prior?.status === "pending")
+      throw new AppError(
+        "Your image is still being created. Try again shortly or open Saved pictures.",
+        409,
+        "GENERATION_PENDING",
+      );
+    const reservation = await this.store.reserveRender(id, requestId, null);
+    if (reservation.kind === "completed") {
+      const v = reservation.version;
+      return {
+        ...v,
+        imageUrl: await this.store.imageUrl(v.imagePath, id, v.id),
+      };
+    }
+    try {
+      const plan = await this.extractScene(id, token, memory.story);
+      // Clicking Submit authorizes generation; detailed scene editing is optional.
+      return await this.produceVersion(
+        id,
+        {
+          requestId,
+          scene: { plan, authorAdditions: "", confirmed: true },
+          baseVersionId: null,
+          instruction: null,
+        },
+        null,
+      );
+    } catch (e) {
+      await this.store.failRender(id, requestId).catch(() => {});
+      throw new AppError(
+        e instanceof AppError
+          ? e.message
+          : "We couldn’t generate this image. Your draft is saved. Please try again.",
+        e instanceof AppError ? e.status : 502,
+        "GENERATION_FAILED",
+      );
+    }
+  }
+  private async produceVersion(
+    id: string,
+    input: RenderInput,
+    base: ImageVersion | null,
+  ): Promise<ImageVersionView> {
     let uploadedPath: string | null = null;
     try {
       const image = base
@@ -209,7 +274,9 @@ export class MemoryService {
       uploadedPath = null;
       return {
         ...version,
-        imageUrl: await this.store.imageUrl(version.imagePath, id, version.id),
+        // Owner-authenticated URL avoids a signing request after the render is
+        // committed; a lost response can safely replay the same request ID.
+        imageUrl: `/api/memories/${id}/images/${version.id}`,
       };
     } catch (error) {
       if (uploadedPath)

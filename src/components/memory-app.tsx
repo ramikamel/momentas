@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -52,7 +52,10 @@ async function api<T>(
   });
   const data = await r.json();
   if (!r.ok)
-    throw new Error(data.error || "Something went wrong. Please try again.");
+    throw Object.assign(
+      new Error(data.error || "Something went wrong. Please try again."),
+      { status: r.status, code: data.code },
+    );
   return data;
 }
 function Brand() {
@@ -65,14 +68,17 @@ function Brand() {
     </Link>
   );
 }
-function Header() {
+export function Header() {
   return (
     <header className="header">
       <Brand />
       <span className="header-note">
         A little closer to the way you remember.
       </span>
-      <Link className="quiet-link" href="/#begin">
+      <Link className="quiet-link saved-link" href="/library">
+        Saved pictures
+      </Link>
+      <Link className="quiet-link create-link" href="/#begin">
         Create a memory <ArrowUpRight size={15} />
       </Link>
     </header>
@@ -189,7 +195,12 @@ export function Landing() {
   const router = useRouter();
   const [draft, setDraft] = useState<DraftInput>(empty),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [createdId, setCreatedId] = useState(""),
+    [busyMessage, setBusyMessage] = useState("");
+  const generationAttempt = useRef<{ signature: string; id: string } | null>(
+    null,
+  );
   function sample() {
     setDraft({
       title: "The day you let go",
@@ -203,12 +214,38 @@ export function Landing() {
   }
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    await createMode("generate");
+  }
+  async function createMode(mode: "generate" | "details") {
     setBusy(true);
     setError("");
+    setBusyMessage("Saving your memory");
     try {
-      const r = await api<{ id: string }>("/api/memories", draft);
-      router.push(`/memory/${r.id}`);
+      let id = createdId;
+      if (!id) {
+        const r = await api<{ id: string }>("/api/memories", draft);
+        id = r.id;
+        setCreatedId(id);
+      } else if (generationAttempt.current?.signature !== JSON.stringify(draft))
+        await api(`/api/memories/${id}`, draft, "PATCH");
+      if (mode === "details") {
+        setBusyMessage("Finding the details in your memory");
+        await api(`/api/memories/${id}/scene`, { story: draft.story });
+      } else {
+        setBusyMessage(
+          "Reconstructing your memory — this can take a few minutes",
+        );
+        const signature = JSON.stringify(draft);
+        if (generationAttempt.current?.signature !== signature)
+          generationAttempt.current = { signature, id: crypto.randomUUID() };
+        await api(`/api/memories/${id}/generate`, {
+          requestId: generationAttempt.current.id,
+        });
+      }
+      router.push(`/memory/${id}`);
     } catch (e) {
+      if ((e as { code?: string }).code === "GENERATION_FAILED")
+        generationAttempt.current = null;
       setError((e as Error).message);
       setBusy(false);
     }
@@ -325,9 +362,26 @@ export function Landing() {
               className="button primary wide"
               type="submit"
             >
-              {busy ? "Saving your memory…" : "Save & review the scene"}
+              {busy ? "Working on your memory…" : "Submit & generate image"}
               <ArrowRight size={18} />
             </button>
+            <button
+              type="button"
+              className="button subtle wide"
+              disabled={busy}
+              onClick={(e) => {
+                if (e.currentTarget.form?.reportValidity())
+                  void createMode("details");
+              }}
+            >
+              Add details
+            </button>
+            {busy && <Busy label={busyMessage || "Saving your memory"} />}
+            {createdId && !busy && (
+              <Link className="quiet-link" href={`/memory/${createdId}`}>
+                Open saved draft →
+              </Link>
+            )}
             <button
               type="button"
               className="button subtle wide"
@@ -479,7 +533,13 @@ function MessageList({
     </div>
   );
 }
-export function Workspace({ id }: { id: string }) {
+export function Workspace({
+  id,
+  initialVersionId,
+}: {
+  id: string;
+  initialVersionId?: string;
+}) {
   const [memory, setMemory] = useState<AuthorMemoryView | null>(null),
     [draft, setDraft] = useState<DraftInput>(empty),
     [stage, setStage] = useState(0),
@@ -494,6 +554,9 @@ export function Workspace({ id }: { id: string }) {
     [shareUrl, setShareUrl] = useState(""),
     [copied, setCopied] = useState(false),
     [reply, setReply] = useState<Record<string, string>>({});
+  const generationAttempt = useRef<{ signature: string; id: string } | null>(
+    null,
+  );
   const base = `/api/memories/${id}`;
   const load = useCallback(
     async (initial = false) => {
@@ -509,22 +572,29 @@ export function Workspace({ id }: { id: string }) {
             narrationId: m.narrationId ?? null,
             scenePlan: m.scenePlan,
           });
-          setSelected(m.versions.at(-1)?.id || "");
+          const chosen =
+            m.versions.find((v) => v.id === initialVersionId) ||
+            m.versions.at(-1);
+          setSelected(chosen?.id || "");
           setApproved(
             !!m.scenePlan &&
               JSON.stringify(m.scenePlan) ===
-                JSON.stringify(m.versions.at(-1)?.scene.plan),
+                JSON.stringify(chosen?.scene.plan),
           );
           setStage(m.versions.length ? 2 : m.scenePlan ? 1 : 0);
           setCaption(m.publishedCaption || "");
           setShareUrl(m.shareUrl || "");
-          setAdditions(m.versions.at(-1)?.scene.authorAdditions || "");
+          setAdditions(chosen?.scene.authorAdditions || "");
+          if (initialVersionId && chosen) {
+            setDraft((d) => ({ ...d, scenePlan: chosen.scene.plan }));
+            setApproved(true);
+          }
         }
       } catch (e) {
         setError((e as Error).message);
       }
     },
-    [base],
+    [base, initialVersionId],
   );
   useEffect(() => {
     void load(true);
@@ -557,7 +627,7 @@ export function Workspace({ id }: { id: string }) {
     });
   }
   async function render() {
-    if (!draft.scenePlan || !approved) return;
+    if (!draft.scenePlan) return;
     await run("Reconstructing your memory", async () => {
       await save();
       const v = await api<ImageVersionView>(`${base}/versions`, {
@@ -570,14 +640,43 @@ export function Workspace({ id }: { id: string }) {
         baseVersionId: memory?.versions.length ? selected : null,
         instruction: memory?.versions.length
           ? instruction.trim() ||
-            "Apply the scene details and author additions I have reviewed and approved."
+            "Apply my current scene details and additions."
           : null,
       });
       setSelected(v.id);
+      setApproved(true);
       setInstruction("");
       await load();
       setStage(2);
     });
+  }
+  async function generateDirectly() {
+    await run(
+      "Reconstructing your memory — this can take a few minutes",
+      async () => {
+        const signature = JSON.stringify(draft);
+        if (generationAttempt.current?.signature !== signature) await save();
+        if (generationAttempt.current?.signature !== signature)
+          generationAttempt.current = { signature, id: crypto.randomUUID() };
+        let v: ImageVersionView;
+        try {
+          v = await api<ImageVersionView>(`${base}/generate`, {
+            requestId: generationAttempt.current.id,
+          });
+        } catch (e) {
+          if ((e as { code?: string }).code === "GENERATION_FAILED")
+            generationAttempt.current = null;
+          throw e;
+        }
+        setSelected(v.id);
+        setDraft((d) => ({ ...d, scenePlan: v.scene.plan }));
+        setAdditions("");
+        setApproved(true);
+        setInstruction("");
+        await load();
+        setStage(2);
+      },
+    );
   }
   const version = memory?.versions.find((v) => v.id === selected);
   return (
@@ -585,8 +684,8 @@ export function Workspace({ id }: { id: string }) {
       <Header />
       <div className="workspace">
         <aside className="sidebar">
-          <Link className="back-link" href="/">
-            <ChevronLeft size={15} /> All beginnings
+          <Link className="back-link" href="/library">
+            <ChevronLeft size={15} /> Saved pictures
           </Link>
           <div className="eyebrow">YOUR MEMORY BOOK</div>
           <h2>{draft.title || "A memory, unfolding."}</h2>
@@ -605,6 +704,8 @@ export function Workspace({ id }: { id: string }) {
               <button
                 className={stage === i ? "active" : ""}
                 disabled={
+                  !!busy ||
+                  !memory ||
                   (i === 1 && !draft.scenePlan) ||
                   (i > 1 && !memory?.versions.length)
                 }
@@ -675,7 +776,7 @@ export function Workspace({ id }: { id: string }) {
                   className="paper editor-card"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    void extract();
+                    void generateDirectly();
                   }}
                 >
                   <VoiceRecorder
@@ -703,11 +804,19 @@ export function Workspace({ id }: { id: string }) {
                       Save draft
                     </button>
                     <button
+                      type="button"
+                      className="button subtle"
+                      disabled={!draft.story.trim()}
+                      onClick={() => void extract()}
+                    >
+                      Add details
+                    </button>
+                    <button
                       className="button primary"
                       type="submit"
                       disabled={!draft.story.trim()}
                     >
-                      Review the scene <ArrowRight size={17} />
+                      Submit & generate image <ArrowRight size={17} />
                     </button>
                   </div>
                 </form>
@@ -756,21 +865,7 @@ export function Workspace({ id }: { id: string }) {
                       placeholder="The afternoon light was golden. My bike had a little bell…"
                     />
                   </Field>
-                  <label className="approval">
-                    <input
-                      type="checkbox"
-                      checked={approved}
-                      onChange={(e) => setApproved(e.target.checked)}
-                    />
-                    <span>
-                      I’ve reviewed this scene. It reflects what I want to show.
-                    </span>
-                  </label>
-                  <button
-                    className="button primary wide"
-                    disabled={!approved}
-                    onClick={render}
-                  >
+                  <button className="button primary wide" onClick={render}>
                     Visualize this memory <Sparkles size={17} />
                   </button>
                   <p className="form-note">
@@ -793,7 +888,9 @@ export function Workspace({ id }: { id: string }) {
                     memoryId={id}
                     version={version}
                     initialPins={memory.pinsByVersion?.[version.id] ?? []}
-                    onSaved={() => { void load(); }}
+                    onSaved={() => {
+                      void load();
+                    }}
                   />
                 )}
                 <div className="version-bar">
@@ -814,6 +911,7 @@ export function Workspace({ id }: { id: string }) {
                           setApproved(true);
                         }}
                         key={v.id}
+                        aria-label={`View saved image ${i + 1}`}
                       >
                         <img src={v.imageUrl} alt="" />
                         <span>{i + 1}</span>
@@ -825,8 +923,9 @@ export function Workspace({ id }: { id: string }) {
                 <div className="paper correction-card">
                   {(!draft.scenePlan || !approved) && (
                     <p className="link-notice">
-                      Your scene needs review. Review and approve its details
-                      before creating another image.
+                      Your scene has changed since this picture. Open scene
+                      details to use those changes, or select a saved image to
+                      keep refining it.
                     </p>
                   )}
                   <Field

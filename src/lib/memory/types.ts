@@ -127,10 +127,14 @@ export type Store = ConnectionStore & {
     message: MemoryMessage,
     expectedPublishedVersion?: string,
   ): Promise<void>;
+  getRenderRequest(
+    memoryId: string,
+    requestId: string,
+  ): Promise<RenderRequest | null>;
   reserveRender(
     memoryId: string,
     requestId: string,
-    cap: number,
+    cap: number | null,
   ): Promise<RenderReservation>;
   completeRender(
     memoryId: string,
@@ -147,4 +151,13 @@ export type Store = ConnectionStore & {
     versionId: string,
     shareToken?: string,
   ): Promise<string>;
+};
+
+export type SavedMemory = {
+  id: string;
+  title: string;
+  authorName: string;
+  recipientName: string;
+  createdAt: string;
+  versions: { id: string; imageUrl: string; createdAt: string }[];
 };

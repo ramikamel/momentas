@@ -15,8 +15,12 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   await context.grantPermissions(["microphone"]);
   await page.goto("/");
   await page.getByRole("button", { name: "Try a sample memory" }).click();
-  await page.getByRole("button", { name: "Save & review the scene" }).click();
+  await page.getByRole("button", { name: "Add details", exact: true }).click();
   await expect(page).toHaveURL(/\/memory\//);
+  await expect(
+    page.getByRole("heading", { name: "Does this feel like your memory?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Tell the memory/ }).click();
   const authorPath = new URL(page.url()).pathname;
   const mid = authorPath.split("/").at(-1)!;
   await page
@@ -39,10 +43,7 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   await page
     .getByRole("button", { name: "Use transcript", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Review the scene", exact: true })
-    .click();
-  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Add details", exact: true }).click();
   await page.getByRole("button", { name: "Visualize this memory" }).click();
   await expect(page.getByText("1 saved image", { exact: true })).toBeVisible();
   await page
@@ -114,9 +115,8 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
       "I was running behind the bicycle. I felt proud when you found your balance.",
     );
   await recipient
-    .getByRole("button", { name: "Review the scene", exact: true })
+    .getByRole("button", { name: "Add details", exact: true })
     .click();
-  await recipient.getByRole("checkbox").check();
   await recipient
     .getByRole("button", { name: "Visualize this memory" })
     .click();
@@ -214,8 +214,12 @@ test("microphone denial preserves typed words and leaves the text flow available
   const words = await page
     .getByLabel("Tell it as you remember it")
     .inputValue();
-  await page.getByRole("button", { name: "Save & review the scene" }).click();
+  await page.getByRole("button", { name: "Add details", exact: true }).click();
   await expect(page).toHaveURL(/\/memory\//);
+  await expect(
+    page.getByRole("heading", { name: "Does this feel like your memory?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Tell the memory/ }).click();
   await page
     .getByRole("button", { name: "Record my memory", exact: true })
     .click();
@@ -228,6 +232,6 @@ test("microphone denial preserves typed words and leaves the text flow available
     words,
   );
   await expect(
-    page.getByRole("button", { name: "Review the scene", exact: true }),
+    page.getByRole("button", { name: "Add details", exact: true }),
   ).toBeEnabled();
 });

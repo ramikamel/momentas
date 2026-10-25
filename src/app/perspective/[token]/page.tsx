@@ -11,6 +11,9 @@ export default async function Page({
       <header className="conn-header">
         <Link href="/">momentas.</Link>
         <span>A little closer to the way you remember.</span>
+        <Link className="conn-library-link" href="/library">
+          Saved pictures
+        </Link>
       </header>
       <PerspectiveInvitation token={token} />
     </>

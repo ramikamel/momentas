@@ -4,13 +4,8 @@ test("image-first details support keyboard placement, outline fallback, cancel, 
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Try a sample memory" }).click();
-  await page.getByRole("button", { name: "Save & review the scene" }).click();
+  await page.getByRole("button", { name: "Submit & generate image" }).click();
   await expect(page).toHaveURL(/\/memory\//);
-  await page
-    .getByRole("button", { name: "Review the scene", exact: true })
-    .click();
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Visualize this memory" }).click();
   await expect(page.getByText("1 saved image", { exact: true })).toBeVisible();
   let replyOutline: (() => Promise<void>) | undefined;
   await page.route("**/outline", async (route) => {

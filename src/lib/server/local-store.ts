@@ -535,6 +535,12 @@ export function createLocalStore(directory: string): Store {
           error("Message already exists");
         s.messages.push(structuredClone(message));
       }),
+    getRenderRequest: (mid, rid) =>
+      transaction(
+        (s) =>
+          s.requests.find((r) => r.id === rid && r.memoryId === mid) ?? null,
+        false,
+      ),
     reserveRender: (mid, rid, cap) =>
       transaction((s) => {
         memory(s, mid);
@@ -558,7 +564,10 @@ export function createLocalStore(directory: string): Store {
           )
         )
           error("Render already pending");
-        if (!Number.isInteger(cap) || cap < 1 || s.requests.length >= cap)
+        if (
+          cap !== null &&
+          (!Number.isInteger(cap) || cap < 1 || s.requests.length >= cap)
+        )
           error("Image request cap reached", 429);
         const now = Date.now();
         s.requests.push({

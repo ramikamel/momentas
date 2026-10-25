@@ -224,3 +224,59 @@ describe("complete memory lifecycle", () => {
     );
   });
 });
+
+it("generates directly from a submitted story and can replay without another model call", async () => {
+  const { service, ai, id, authorToken } = await setup();
+  const requestId = randomUUID();
+  const first = await service.generateFromStory(id, authorToken, requestId);
+  const repeat = await service.generateFromStory(id, authorToken, requestId);
+  expect(first.id).toBe(repeat.id);
+  expect(ai.extractScene).toHaveBeenCalledTimes(1);
+  expect(ai.generateImage).toHaveBeenCalledTimes(1);
+});
+it("keeps generation working beyond 24 old attempts even if the old env cap is set", async () => {
+  const { service, store, id, authorToken } = await setup();
+  for (let i = 0; i < 25; i++) {
+    const rid = randomUUID();
+    await store.reserveRender(id, rid, 100);
+    await store.failRender(id, rid);
+  }
+  vi.stubEnv("MAX_IMAGE_REQUESTS", "1");
+  try {
+    await expect(
+      service.renderVersion(id, authorToken, {
+        requestId: randomUUID(),
+        scene,
+        baseVersionId: null,
+        instruction: null,
+      }),
+    ).resolves.toHaveProperty("id");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+it("distinguishes pending from terminal failed or expired submissions so retries can recover", async () => {
+  const { service, store, id, authorToken, ai } = await setup();
+  const rid = randomUUID();
+  await store.reserveRender(id, rid, null);
+  await expect(
+    service.generateFromStory(id, authorToken, rid),
+  ).rejects.toMatchObject({ code: "GENERATION_PENDING" });
+  expect(ai.extractScene).not.toHaveBeenCalled();
+  const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 301000);
+  try {
+    await expect(
+      service.generateFromStory(id, authorToken, rid),
+    ).rejects.toMatchObject({ code: "GENERATION_FAILED" });
+  } finally {
+    spy.mockRestore();
+  }
+  await expect(
+    service.generateFromStory(id, authorToken, rid),
+  ).rejects.toMatchObject({ code: "GENERATION_FAILED" });
+  await expect(
+    service.generateFromStory(id, authorToken, randomUUID()),
+  ).resolves.toHaveProperty("id");
+  expect(ai.generateImage).toHaveBeenCalledTimes(1);
+});

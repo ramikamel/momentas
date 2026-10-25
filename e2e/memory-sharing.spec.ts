@@ -8,23 +8,17 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
   await expect(page.getByLabel("Give this memory a title")).toHaveValue(
     "The day you let go",
   );
-  await page.getByRole("button", { name: "Save & review the scene" }).click();
+  await page.getByRole("button", { name: "Add details", exact: true }).click();
   await expect(page).toHaveURL(/\/memory\//);
   const authorUrl = page.url();
-  await page
-    .getByRole("button", { name: "Review the scene", exact: true })
-    .click();
   await expect(
     page.getByRole("heading", { name: "Does this feel like your memory?" }),
   ).toBeVisible();
-  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Visualize this memory" }).click();
   await expect(
     page.getByRole("heading", { name: "A little closer to how it felt." }),
   ).toBeVisible();
-  await expect(
-    page.getByText("1 saved image", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("1 saved image", { exact: true })).toBeVisible();
   await page
     .getByLabel("What would bring it closer?")
     .fill("[test-fail] Put Dad farther behind me.");
@@ -35,16 +29,12 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
   await expect(page.getByLabel("What would bring it closer?")).toHaveValue(
     "[test-fail] Put Dad farther behind me.",
   );
-  await expect(
-    page.getByText("1 saved image", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("1 saved image", { exact: true })).toBeVisible();
   await page
     .getByLabel("What would bring it closer?")
     .fill("Put Dad farther behind me.");
   await page.getByRole("button", { name: "Make this change" }).click();
-  await expect(
-    page.getByText("2 saved images", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("2 saved images", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Share this image" }).click();
   await page
     .getByLabel("A few words to go with it")
@@ -137,6 +127,9 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
     page.getByRole("button", { name: "Make this change" }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Review scene details" }).click();
-  await expect(page.getByRole("checkbox")).not.toBeChecked();
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Visualize this memory" }),
+  ).toBeEnabled();
   await recipientContext.close();
 });

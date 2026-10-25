@@ -59,7 +59,7 @@ Verified during implementation: unit/integration tests, browser create/review/re
 
 Vercel production needs the three required secrets, configured in its encrypted environment after explicit user approval. Keep `E2E_TEST_MODE` unset. Image routes advertise `maxDuration=300`; Meta requests time out after 240 seconds without automatic retries. Verify the deployed account's runtime limit. Optional `APP_ORIGIN` pins one exact origin; otherwise requests are checked against the current request origin.
 
-`MAX_IMAGE_REQUESTS=24` caps all reserved image attempts across the database, including failures. This is not a dollar limit. Concurrency and reservation checks are atomic. Inspect credit before raising it. `.vercelignore` excludes local secrets, editing capabilities, fixtures, scratch files and test outputs.
+The demo no longer has the application-level 24-image request cap. The old MAX_IMAGE_REQUESTS setting is ignored. Concurrency and completed-request replay checks remain atomic; provider rate limits still apply. `.vercelignore` excludes local secrets, editing capabilities, fixtures, scratch files and test outputs.
 
 Prototype limitations: browser-bound editing without account recovery, unlisted bearer links rather than verified recipient identities, variable image latency and consistency. Notifications, live-streaming transcription, animation, face matching, multiple styles, and blockchain are deferred.
 
@@ -80,3 +80,6 @@ The browser suite covers actual capture with a controlled microphone fixture, tr
 
 
 Image details use **Add a detail → click the image → write a note → Save detail**. Meta SAM 3.1 can outline the clicked object; notes can also use a simple pin. New notes are labeled as storyteller additions, while existing source quotes retain their provenance. Apply `supabase/migrations/003_detail_outlines.sql` after 001 and 002 to enable the durable SAM request budget (20 attempts per image version, 120 across the project, including failed attempts). If outlines are unavailable, note saving remains available.
+
+
+Use **Submit & generate image** to go directly from words to an image, or **Add details** to open the optional scene editor. No separate review checkbox is required. **Saved pictures** in the header opens all drafts and image versions owned by the current browser; each version opens directly in the editor. Ownership remains in HttpOnly cookies, so another browser cannot browse private drafts.

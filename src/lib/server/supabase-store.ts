@@ -163,11 +163,29 @@ export function createSupabaseStore(
         p_expected_version: expected ?? null,
       });
     },
+    async getRenderRequest(mid, rid) {
+      const rows = await request(
+        `/rest/v1/render_requests?memory_id=eq.${encodeURIComponent(mid)}&id=eq.${encodeURIComponent(rid)}&limit=1`,
+      );
+      const r = rows[0];
+      return r
+        ? {
+            id: r.id,
+            memoryId: r.memory_id,
+            status: r.status,
+            createdAt: r.created_at,
+            expiresAt: r.expires_at,
+            versionId: r.version_id,
+          }
+        : null;
+    },
     async reserveRender(mid, rid, cap) {
       const result = await rpc("reserve_render", {
         p_memory_id: mid,
         p_request_id: rid,
-        p_cap: cap,
+        // Existing RPC takes an int cap. Its maximum value represents the
+        // uncapped demo policy without a breaking schema migration.
+        p_cap: cap ?? 2147483647,
       });
       return result.kind === "completed"
         ? {
