@@ -62,7 +62,7 @@ The existing `Store` acquires cohesive operations below; implement each in local
 - [ ] Run `npm test -- tests/publications.test.ts tests/access.test.ts tests/store.test.ts tests/supabase.test.ts`; observe the new behavior fail for the expected reason.
 - [ ] Implement the contracts and additive tables/FKs/grants/private `memory-audio` bucket. Initially pins/narration are empty/null. Store publication and legacy fields in one RPC transaction, with cross-memory ownership constraints. Include backfill SQL for current published memories. Later tasks append to the same unpublished migration under the store owner's coordination.
 - [ ] Run the targeted tests and `npm run typecheck`; require all pass. Verify two snapshots of the same image remain distinct and later updates cannot mutate the first.
-- [ ] Commit this milestone. Apply/verify the migration in the designated Supabase project before deploying any code that requires it; prepare the complete SQL first. Existing service-role REST access cannot execute schema setup, so SQL Editor or a separately available migration credential is an execution checkpoint.
+- [ ] Commit this milestone. Keep the extension migration unpublished while Tasks 2–6 add their schema/RPCs; use local-adapter tests and Supabase adapter contract tests during development. Apply the finalized migration exactly once in Task 7 before deploying code that requires it. Existing service-role REST access cannot execute schema setup, so SQL Editor or a separately available migration credential is an execution checkpoint. Never edit an already applied migration.
 
 ## Task 2: Record, transcribe, and share the real voice (75–90 min)
 
