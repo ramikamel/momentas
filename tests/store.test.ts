@@ -57,7 +57,11 @@ test("persists memories and image mime across adapters", async () => {
     mimeType: "image/png",
   });
   const reopened = createLocalStore(dir);
-  expect(await reopened.getMemory("m")).toEqual(memory());
+  expect(await reopened.getMemory("m")).toEqual({
+    ...memory(),
+    narrationId: null,
+    currentPublicationId: null,
+  });
   expect(await reopened.readImage("m/v.png")).toEqual({
     bytes: new Uint8Array([1, 2]),
     mimeType: "image/png",

@@ -1,3 +1,4 @@
+import { createConnectionSupabaseStore } from "./connection-supabase-store";
 import type {
   Store,
   MemoryRecord,
@@ -6,6 +7,8 @@ import type {
   GeneratedImage,
 } from "../memory/types";
 const memoryFields = {
+  narrationId: "narration_id",
+  currentPublicationId: "current_publication_id",
   id: "id",
   title: "title",
   authorName: "author_name",
@@ -37,6 +40,8 @@ const messageFields = {
   role: "role",
   displayName: "display_name",
   text: "text",
+  publicationId: "publication_id",
+  pinId: "pin_id",
   parentId: "parent_id",
   createdAt: "created_at",
 } as const;
@@ -107,6 +112,7 @@ export function createSupabaseStore(
   const filter = (key: string, value: string) =>
     `${key}=eq.${encodeURIComponent(value)}`;
   return {
+    ...createConnectionSupabaseStore(url, key),
     async createMemory(m) {
       await request("/rest/v1/memories", {
         method: "POST",

@@ -1,3 +1,10 @@
+import type {
+  PublicationSnapshot,
+  NarrationRecord,
+  PinDraft,
+  PerspectiveLink,
+  ConnectionRequest,
+} from "../memory/connections";
 import {
   mkdir,
   readFile,
@@ -16,6 +23,11 @@ import type {
   RenderRequest,
 } from "../memory/types";
 type State = {
+  publications: PublicationSnapshot[];
+  narrations: NarrationRecord[];
+  pins: Record<string, PinDraft[]>;
+  links: PerspectiveLink[];
+  connectionRequests: ConnectionRequest[];
   memories: MemoryRecord[];
   versions: ImageVersion[];
   messages: MemoryMessage[];
@@ -43,7 +55,42 @@ export function createLocalStore(directory: string): Store {
           state = JSON.parse(await readFile(file, "utf8"));
         } catch (e) {
           if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-          state = { memories: [], versions: [], messages: [], requests: [] };
+          state = {
+            memories: [],
+            versions: [],
+            messages: [],
+            requests: [],
+            publications: [],
+            narrations: [],
+            pins: {},
+            links: [],
+            connectionRequests: [],
+          };
+        }
+        state.publications ??= [];
+        state.narrations ??= [];
+        state.pins ??= {};
+        state.links ??= [];
+        state.connectionRequests ??= [];
+        for (const m of state.memories) {
+          m.narrationId ??= null;
+          m.currentPublicationId ??= null;
+          if (m.publishedVersionId && !m.currentPublicationId) {
+            const p = {
+              id: randomUUID(),
+              memoryId: m.id,
+              versionId: m.publishedVersionId,
+              title: m.publishedTitle,
+              authorName: m.publishedAuthorName,
+              recipientName: m.publishedRecipientName,
+              caption: m.publishedCaption,
+              pins: [],
+              narrationId: null,
+              createdAt: m.createdAt,
+            };
+            state.publications.push(p);
+            m.currentPublicationId = p.id;
+          }
         }
         const result = await fn(state);
         if (save) {
@@ -56,13 +103,13 @@ export function createLocalStore(directory: string): Store {
     locks.set(root, operation);
     return operation;
   }
-  function imagePath(path: string) {
+  function imagePath(path: string, area = "images") {
     if (
       !/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_.-]+)*$/.test(path) ||
       path.split("/").some((x) => x === "." || x === "..")
     )
       error("Invalid image path", 400);
-    return join(root, "images", path);
+    return join(root, area, path);
   }
   function memory(s: State, id: string) {
     return (
@@ -75,7 +122,347 @@ export function createLocalStore(directory: string): Store {
       error("Version not found", 404)
     );
   }
+  function narration(s: State, id: string) {
+    return (
+      s.narrations.find((n) => n.id === id) ?? error("Narration not found", 404)
+    );
+  }
+  function relation(s: State, id: string) {
+    return (
+      s.links.find((l) => l.id === id) ?? error("Perspective not found", 404)
+    );
+  }
+  function publication(s: State, id: string) {
+    return (
+      s.publications.find((p) => p.id === id) ??
+      error("Publication not found", 404)
+    );
+  }
   return {
+    publishSnapshot: (mid, input) =>
+      transaction((s) => {
+        const m = memory(s, mid);
+        ownVersion(s, input.versionId, mid);
+        const n =
+          input.includeNarration && m.narrationId
+            ? narration(s, m.narrationId)
+            : null;
+        if (n && n.memoryId !== mid)
+          error("Narration belongs to another memory");
+        const p: PublicationSnapshot = {
+          id: randomUUID(),
+          memoryId: mid,
+          versionId: input.versionId,
+          title: m.title,
+          authorName: m.authorName,
+          recipientName: m.recipientName,
+          caption: input.caption,
+          pins: (s.pins[`${mid}/${input.versionId}`] ?? []).map(
+            ({ id, x, y, label, sourceQuote }) => ({
+              id,
+              x,
+              y,
+              label,
+              sourceQuote,
+            }),
+          ),
+          narrationId: n?.id ?? null,
+          createdAt: new Date().toISOString(),
+        };
+        s.publications.push(structuredClone(p));
+        Object.assign(m, {
+          currentPublicationId: p.id,
+          publishedVersionId: p.versionId,
+          publishedCaption: p.caption,
+          publishedTitle: p.title,
+          publishedAuthorName: p.authorName,
+          publishedRecipientName: p.recipientName,
+          shareTokenHash: input.shareTokenHash,
+        });
+        return p;
+      }),
+    getPublication: (id) =>
+      transaction((s) => s.publications.find((p) => p.id === id) ?? null),
+    getVersionPins: (mid, vid) =>
+      transaction((s) => {
+        ownVersion(s, vid, mid);
+        return s.pins[`${mid}/${vid}`] ?? [];
+      }),
+    saveVersionPins: (mid, vid, pins) =>
+      transaction((s) => {
+        const v = ownVersion(s, vid, mid);
+        if (
+          pins.length > 5 ||
+          new Set(pins.map((p) => p.id)).size !== pins.length
+        )
+          error("Invalid pins", 400);
+        for (const p of pins) {
+          const parts = p.detailPath
+            .replace(/^plan\./, "")
+            .replace(/\[(\d+)\]/g, ".$1")
+            .split(".");
+          let detail: unknown = v.scene.plan;
+          for (const part of parts)
+            detail =
+              detail && typeof detail === "object"
+                ? (detail as Record<string, unknown>)[part]
+                : undefined;
+          const d = detail as
+            | { text?: string; sourceQuote?: string }
+            | undefined;
+          if (
+            !p.id ||
+            !Number.isFinite(p.x) ||
+            !Number.isFinite(p.y) ||
+            p.x < 0 ||
+            p.x > 1 ||
+            p.y < 0 ||
+            p.y > 1 ||
+            !p.sourceQuote ||
+            p.sourceQuote.length > 500 ||
+            d?.text !== p.label ||
+            !d?.sourceQuote?.includes(p.sourceQuote)
+          )
+            error("Invalid sourced pin", 400);
+        }
+        s.pins[`${mid}/${vid}`] = structuredClone(pins);
+      }),
+    saveNarration: (n) =>
+      transaction((s) => {
+        memory(s, n.memoryId);
+        imagePath(n.audioPath, "audio");
+        if (
+          s.narrations.some((x) => x.id === n.id || x.audioPath === n.audioPath)
+        )
+          error("Narration already exists");
+        if (
+          !Number.isInteger(n.durationMs) ||
+          n.durationMs < 1 ||
+          n.durationMs > 60000
+        )
+          error("Invalid narration duration", 400);
+        s.narrations.push(structuredClone(n));
+      }),
+    getNarration: (id) =>
+      transaction((s) => s.narrations.find((n) => n.id === id) ?? null),
+    narrations: (mid) =>
+      transaction((s) => s.narrations.filter((n) => n.memoryId === mid)),
+    async putAudio(path, bytes) {
+      const target = imagePath(path, "audio");
+      await mkdir(join(target, ".."), { recursive: true });
+      await writeFile(target, bytes, { mode: 0o600, flag: "wx" });
+    },
+    async readAudio(path) {
+      return new Uint8Array(await readFile(imagePath(path, "audio")));
+    },
+    async removeAudio(path) {
+      await unlink(imagePath(path, "audio")).catch((e) => {
+        if (e.code !== "ENOENT") throw e;
+      });
+    },
+    async audioUrl(n, cap) {
+      return `/api/memories/${encodeURIComponent(n.memoryId)}/narrations/${encodeURIComponent(n.id)}/audio${cap?.share ? `?share=${encodeURIComponent(cap.share)}` : cap?.comparison ? `?comparison=${encodeURIComponent(cap.comparison)}` : ""}`;
+    },
+    reserveConnectionRequest: (kind, resourceId, id, cap) =>
+      transaction((s) => {
+        const target =
+          kind === "voice" ? narration(s, resourceId) : relation(s, resourceId);
+        const old = s.connectionRequests.find((r) => r.id === id);
+        if (old) {
+          if (old.kind !== kind || old.resourceId !== resourceId)
+            error("Request belongs to another resource");
+          if (old.status === "complete") return "completed" as const;
+          error("Request already used");
+        }
+        if (
+          kind === "comparison" &&
+          !(target as PerspectiveLink).contributionPublicationId
+        )
+          error("Comparison not ready");
+        if (kind === "voice" && (target as NarrationRecord).transcript !== null)
+          error("Transcript already complete");
+        if (
+          s.connectionRequests.some(
+            (r) =>
+              r.kind === kind &&
+              r.resourceId === resourceId &&
+              r.status === "pending" &&
+              Date.parse(r.expiresAt) > Date.now(),
+          )
+        )
+          error("Request already pending");
+        if (
+          !Number.isInteger(cap) ||
+          cap < 1 ||
+          s.connectionRequests.filter((r) => r.kind === kind).length >= cap
+        )
+          error("Connection request cap reached", 429);
+        s.connectionRequests.push({
+          id,
+          kind,
+          resourceId,
+          status: "pending",
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 300000).toISOString(),
+        });
+        if (kind === "voice")
+          (target as NarrationRecord).transcriptionStatus = "pending";
+        else (target as PerspectiveLink).synthesisStatus = "pending";
+        return "reserved" as const;
+      }),
+    completeConnectionRequest: (kind, resourceId, id, result) =>
+      transaction((s) => {
+        const r = s.connectionRequests.find(
+          (r) => r.id === id && r.kind === kind && r.resourceId === resourceId,
+        );
+        if (
+          !r ||
+          r.status !== "pending" ||
+          Date.parse(r.expiresAt) <= Date.now()
+        )
+          error("Reservation expired or inactive");
+        if (kind === "voice") {
+          const n = narration(s, resourceId);
+          if (typeof result.transcript !== "string" || n.transcript !== null)
+            error("Invalid transcript");
+          n.transcript = result.transcript;
+          n.transcriptionStatus = "complete";
+        } else {
+          const l = relation(s, resourceId);
+          if (!l.contributionPublicationId || !result.synthesis)
+            error("Invalid comparison");
+          l.synthesis = structuredClone(result.synthesis);
+          l.synthesisStatus = "complete";
+        }
+        r.status = "complete";
+      }),
+    failConnectionRequest: (kind, resourceId, id) =>
+      transaction((s) => {
+        const r = s.connectionRequests.find(
+          (r) => r.id === id && r.kind === kind && r.resourceId === resourceId,
+        );
+        if (r?.status === "pending") {
+          r.status = "failed";
+          if (kind === "voice")
+            narration(s, resourceId).transcriptionStatus = "failed";
+          else relation(s, resourceId).synthesisStatus = "failed";
+        }
+      }),
+    createOrGetPerspectiveLink: (l) =>
+      transaction((s) => {
+        const old = s.links.find(
+          (x) => x.originalMemoryId === l.originalMemoryId,
+        );
+        if (old) return old;
+        const p = publication(s, l.originalPublicationId);
+        if (p.memoryId !== l.originalMemoryId)
+          error("Publication belongs to another memory");
+        if (
+          !l.eventLabel.trim() ||
+          l.eventLabel.length > 120 ||
+          l.contributionMemoryId ||
+          l.contributionPublicationId
+        )
+          error("Invalid perspective", 400);
+        if (
+          s.links.some(
+            (x) =>
+              x.id === l.id ||
+              x.inviteTokenHash === l.inviteTokenHash ||
+              x.comparisonTokenHash === l.comparisonTokenHash,
+          )
+        )
+          error("Perspective already exists");
+        s.links.push(structuredClone(l));
+        return l;
+      }),
+    getPerspectiveLink: (id) =>
+      transaction((s) => s.links.find((l) => l.id === id) ?? null),
+    findPerspectiveByInviteHash: (hash) =>
+      transaction(
+        (s) => s.links.find((l) => l.inviteTokenHash === hash) ?? null,
+      ),
+    findPerspectiveByComparisonHash: (hash) =>
+      transaction(
+        (s) => s.links.find((l) => l.comparisonTokenHash === hash) ?? null,
+      ),
+    findPerspectiveByMemory: (mid) =>
+      transaction(
+        (s) =>
+          s.links.find(
+            (l) => l.originalMemoryId === mid || l.contributionMemoryId === mid,
+          ) ?? null,
+      ),
+    claimPerspective: (id, candidate) =>
+      transaction((s) => {
+        const l = relation(s, id);
+        if (l.contributionMemoryId) return l.contributionMemoryId;
+        if (
+          candidate.id === l.originalMemoryId ||
+          s.memories.some((m) => m.id === candidate.id)
+        )
+          error("Memory already exists");
+        s.memories.push(structuredClone(candidate));
+        l.contributionMemoryId = candidate.id;
+        return candidate.id;
+      }),
+    attachPerspectivePublication: (id, mid, pid) =>
+      transaction((s) => {
+        const l = relation(s, id),
+          p = publication(s, pid),
+          m = memory(s, mid);
+        if (l.contributionMemoryId !== mid || p.memoryId !== mid)
+          error("Publication belongs to another memory");
+        if (l.contributionPublicationId) {
+          if (l.contributionPublicationId !== pid)
+            error("Comparison is frozen");
+          return;
+        }
+        if (m.currentPublicationId !== pid) error("Publication changed");
+        l.contributionPublicationId = pid;
+      }),
+    addPublishedMessage: (message, guard) =>
+      transaction((s) => {
+        const m = memory(s, message.memoryId),
+          p = publication(s, guard.publicationId);
+        if (
+          p.memoryId !== m.id ||
+          p.versionId !== message.versionId ||
+          message.publicationId !== p.id
+        )
+          error("Invalid message publication");
+        if (guard.kind === "current") {
+          if (m.currentPublicationId !== p.id) error("Publication changed");
+        } else {
+          const l = relation(s, guard.linkId);
+          if (
+            !l.contributionPublicationId ||
+            ![l.originalPublicationId, l.contributionPublicationId].includes(
+              p.id,
+            )
+          )
+            error("Publication outside comparison");
+        }
+        if (message.pinId && !p.pins.some((x) => x.id === message.pinId))
+          error("Pin not found", 404);
+        if (message.parentId) {
+          const parent = s.messages.find(
+            (x) =>
+              x.id === message.parentId &&
+              x.memoryId === m.id &&
+              x.versionId === p.versionId,
+          );
+          if (
+            !parent ||
+            parent.publicationId !== p.id ||
+            (parent.pinId ?? null) !== (message.pinId ?? null)
+          )
+            error("Invalid reply context", 400);
+        }
+        if (s.messages.some((x) => x.id === message.id))
+          error("Message already exists");
+        s.messages.push(structuredClone(message));
+      }),
     createMemory: (m) =>
       transaction((s) => {
         if (s.memories.some((x) => x.id === m.id))
@@ -83,7 +470,7 @@ export function createLocalStore(directory: string): Store {
         s.memories.push(structuredClone(m));
       }),
     getMemory: (id) =>
-      transaction((s) => s.memories.find((m) => m.id === id) ?? null, false),
+      transaction((s) => s.memories.find((m) => m.id === id) ?? null, true),
     updateMemory: (id, update) =>
       transaction((s) => {
         const m = memory(s, id);
@@ -99,9 +486,9 @@ export function createLocalStore(directory: string): Store {
         false,
       ),
     versions: (id) =>
-      transaction((s) => s.versions.filter((v) => v.memoryId === id), false),
+      transaction((s) => s.versions.filter((v) => v.memoryId === id), true),
     messages: (id) =>
-      transaction((s) => s.messages.filter((v) => v.memoryId === id), false),
+      transaction((s) => s.messages.filter((v) => v.memoryId === id), true),
     addMessage: (message, expected) =>
       transaction((s) => {
         const m = memory(s, message.memoryId);

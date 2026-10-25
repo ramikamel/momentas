@@ -13,6 +13,7 @@ export async function GET(
       versionId,
       authorTokenFrom(request, id),
       new URL(request.url).searchParams.get("share"),
+      new URL(request.url).searchParams.get("comparison"),
     );
     return new Response(new Uint8Array(image.bytes), {
       headers: {

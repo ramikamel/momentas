@@ -13,7 +13,8 @@ export const draftSchema = z.object({
   title: text(120),
   authorName: text(80),
   recipientName: text(80),
-  story: text(6000),
+  story: z.string().trim().max(6000),
+  narrationId: z.uuid().nullable().default(null),
   scenePlan: scenePlanSchema.nullable().default(null),
 });
 export const approvedSceneSchema = z.object({
@@ -35,10 +36,13 @@ export const renderSchema = z
 export const publishSchema = z.object({
   versionId: z.uuid(),
   caption: text(2000),
+  includeNarration: z.boolean().default(false),
 });
 export const messageSchema = z.object({
   versionId: z.uuid(),
   displayName: text(80),
   text: text(2000),
+  publicationId: z.uuid().nullable().optional(),
+  pinId: z.uuid().nullable().optional(),
 });
 export const replySchema = z.object({ parentId: z.uuid(), text: text(2000) });

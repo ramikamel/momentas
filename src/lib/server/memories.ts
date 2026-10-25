@@ -17,15 +17,17 @@ import {
   replySchema,
 } from "@/lib/memory/schema";
 import { validateSceneEvidence } from "@/lib/memory/prompts";
-import {
-  AppError,
-  createToken,
-  hashToken,
-  matchesToken,
-  shareTokenFor,
-} from "./access";
+import { AppError, createToken, hashToken, shareTokenFor } from "./access";
 import { getAiProvider, validateGeneratedImage, type AiProvider } from "./meta";
 import { getStore } from "./store";
+import {
+  requireAuthor,
+  requireShared,
+  publicationView,
+  requireComparison,
+} from "./authorization";
+import { PerspectiveService } from "./perspectives";
+import { z } from "zod";
 
 export class MemoryService {
   constructor(
@@ -33,22 +35,10 @@ export class MemoryService {
     private ai: AiProvider,
   ) {}
   private async requireAuthor(id: string, token: string) {
-    const memory = await this.store.getMemory(id);
-    if (!memory || !matchesToken(token, memory.authorTokenHash))
-      throw new AppError(
-        "Open this memory in the browser where you created it to edit it.",
-        403,
-        "AUTHOR_REQUIRED",
-      );
-    return memory;
+    return requireAuthor(this.store, { memoryId: id, ownerToken: token });
   }
   private async requireShared(token: string) {
-    if (!token || token.length > 128)
-      throw new AppError("This shared memory was not found.", 404, "NOT_FOUND");
-    const m = await this.store.findShared(hashToken(token));
-    if (!m || !m.publishedVersionId)
-      throw new AppError("This shared memory was not found.", 404, "NOT_FOUND");
-    return m;
+    return requireShared(this.store, token);
   }
   private checkAi() {
     if (this.ai.configured === false)
@@ -84,16 +74,55 @@ export class MemoryService {
         imageUrl: await this.store.imageUrl(v.imagePath, id, v.id),
       })),
     );
+    const messages = await this.store.messages(id);
+    const publicationIds = [
+      ...new Set(
+        messages
+          .map((message) => message.publicationId)
+          .filter((value): value is string => !!value),
+      ),
+    ];
+    const messagePublications = await Promise.all(
+      publicationIds.map((pid) => this.store.getPublication(pid)),
+    );
+    const contextualMessages = messages.map((message) => ({
+      ...message,
+      pinContext:
+        messagePublications
+          .find((p) => p?.id === message.publicationId)
+          ?.pins.find((pin) => pin.id === message.pinId) ?? null,
+    }));
     return {
       id: m.id,
       title: m.title,
       authorName: m.authorName,
       recipientName: m.recipientName,
       story: m.story,
+      narrationId: m.narrationId ?? null,
+      currentPublicationId: m.currentPublicationId ?? null,
+      narrations: await Promise.all(
+        (await this.store.narrations(id)).map(async (n) => {
+          const { audioPath: _, ...v } = n;
+          void _;
+          return { ...v, audioUrl: await this.store.audioUrl(n) };
+        }),
+      ),
+      pinsByVersion: Object.fromEntries(
+        await Promise.all(
+          versions.map(async (v) => [
+            v.id,
+            await this.store.getVersionPins(id, v.id),
+          ]),
+        ),
+      ),
+      perspective: await new PerspectiveService(this.store).authorContext({
+        memoryId: id,
+        ownerToken: token,
+      }),
       scenePlan: m.scenePlan,
       createdAt: m.createdAt,
       versions,
-      messages: await this.store.messages(id),
+      messages: contextualMessages,
       publishedVersionId: m.publishedVersionId,
       publishedCaption: m.publishedCaption,
       shareUrl: m.shareTokenHash ? `/share/${shareTokenFor(token, id)}` : null,
@@ -101,10 +130,17 @@ export class MemoryService {
   }
   async saveDraft(id: string, token: string, input: DraftInput): Promise<void> {
     await this.requireAuthor(id, token);
-    await this.store.updateMemory(id, draftSchema.parse(input));
+    const draft = draftSchema.parse(input);
+    if (draft.narrationId) {
+      const n = await this.store.getNarration(draft.narrationId);
+      if (!n || n.memoryId !== id)
+        throw new AppError("Choose your own recording.", 403);
+    }
+    await this.store.updateMemory(id, draft);
   }
   async extractScene(id: string, token: string, story: string) {
     const m = await this.requireAuthor(id, token);
+    z.string().trim().min(1).max(6000).parse(story);
     const draft = draftSchema.parse({ ...m, story });
     await this.store.updateMemory(id, { story: draft.story });
     this.checkAi();
@@ -187,18 +223,17 @@ export class MemoryService {
     token: string,
     versionId: string,
     caption: string,
+    includeNarration = false,
   ) {
-    const m = await this.requireAuthor(id, token);
+    await this.requireAuthor(id, token);
     const input = publishSchema.parse({ versionId, caption });
     if (!(await this.store.versions(id)).some((v) => v.id === input.versionId))
       throw new AppError("Choose an image from this memory.", 404, "NOT_FOUND");
     const shareToken = shareTokenFor(token, id);
-    await this.store.updateMemory(id, {
-      publishedVersionId: input.versionId,
-      publishedCaption: input.caption,
-      publishedTitle: m.title,
-      publishedAuthorName: m.authorName,
-      publishedRecipientName: m.recipientName,
+    await this.store.publishSnapshot(id, {
+      versionId: input.versionId,
+      caption: input.caption,
+      includeNarration,
       shareTokenHash: hashToken(shareToken),
     });
     return { shareUrl: `/share/${shareToken}` };
@@ -209,12 +244,17 @@ export class MemoryService {
       (v) => v.id === m.publishedVersionId,
     );
     if (!version)
-      throw new AppError(
-        "This image is not available.",
-        404,
-        "NOT_FOUND",
-      );
+      throw new AppError("This image is not available.", 404, "NOT_FOUND");
+    const p = m.currentPublicationId
+      ? await this.store.getPublication(m.currentPublicationId)
+      : null;
+    const view = p
+      ? await publicationView(this.store, p, { share: token })
+      : null;
     return {
+      publicationId: p?.id,
+      pins: p?.pins ?? [],
+      narration: view?.narration ?? null,
       title: m.publishedTitle,
       authorName: m.publishedAuthorName,
       recipientName: m.publishedRecipientName,
@@ -226,15 +266,25 @@ export class MemoryService {
         version.id,
         token,
       ),
-      imageDescription:
-        version.scene.plan.setting?.text ||
-        "An AI memory reconstruction, shaped by its storyteller.",
-      messages: await this.store.messages(m.id),
+      imageDescription: `AI reconstruction of ${m.publishedTitle}, shaped by its storyteller.`,
+      messages: (await this.store.messages(m.id)).map((message) => ({
+        ...message,
+        pinContext:
+          message.publicationId === p?.id
+            ? (p?.pins.find((pin) => pin.id === message.pinId) ?? null)
+            : null,
+      })),
     };
   }
   async postRecipientMessage(
     token: string,
-    raw: { versionId: string; displayName: string; text: string },
+    raw: {
+      versionId: string;
+      displayName: string;
+      text: string;
+      publicationId?: string | null;
+      pinId?: string | null;
+    },
   ): Promise<MemoryMessage> {
     const m = await this.requireShared(token),
       input = messageSchema.parse(raw);
@@ -244,17 +294,32 @@ export class MemoryService {
         409,
         "VERSION_CHANGED",
       );
+    if (input.publicationId && input.publicationId !== m.currentPublicationId)
+      throw new AppError(
+        "This shared memory changed. Refresh before sending; your words are still here.",
+        409,
+        "VERSION_CHANGED",
+      );
+    if (input.pinId && !input.publicationId)
+      throw new AppError("Select the current published detail.", 400);
     const message: MemoryMessage = {
       id: randomUUID(),
       memoryId: m.id,
       versionId: input.versionId,
+      publicationId: input.publicationId ?? m.currentPublicationId ?? null,
+      pinId: input.pinId ?? null,
       role: "recipient",
       displayName: input.displayName,
       text: input.text,
       parentId: null,
       createdAt: new Date().toISOString(),
     };
-    await this.store.addMessage(message, input.versionId);
+    if (message.publicationId)
+      await this.store.addPublishedMessage(message, {
+        kind: "current",
+        publicationId: message.publicationId,
+      });
+    else await this.store.addMessage(message, input.versionId);
     return message;
   }
   async postStorytellerReply(
@@ -278,6 +343,8 @@ export class MemoryService {
       displayName: m.publishedAuthorName || m.authorName,
       text: input.text,
       parentId: parent.id,
+      publicationId: parent.publicationId ?? null,
+      pinId: parent.pinId ?? null,
       createdAt: new Date().toISOString(),
     };
     await this.store.addMessage(reply);
@@ -288,8 +355,17 @@ export class MemoryService {
     versionId: string,
     authorToken: string,
     shareToken: string | null,
+    comparisonToken: string | null = null,
   ) {
-    if (shareToken) {
+    if (comparisonToken) {
+      const link = await requireComparison(this.store, comparisonToken);
+      const pubs = await Promise.all([
+        this.store.getPublication(link.originalPublicationId),
+        this.store.getPublication(link.contributionPublicationId!),
+      ]);
+      if (!pubs.some((p) => p?.memoryId === id && p.versionId === versionId))
+        throw new AppError("This image is not shared.", 403);
+    } else if (shareToken) {
       const m = await this.requireShared(shareToken);
       if (m.id !== id || m.publishedVersionId !== versionId)
         throw new AppError("This image is not shared.", 403, "IMAGE_DENIED");

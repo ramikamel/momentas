@@ -17,6 +17,7 @@ export async function POST(
         authorTokenFrom(request, id),
         input.versionId,
         input.caption,
+        input.includeNarration,
       ),
     );
   });

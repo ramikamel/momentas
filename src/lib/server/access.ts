@@ -28,7 +28,10 @@ export function matchesToken(token: string, expected: string): boolean {
   );
 }
 // Immutable v1 derivation domain: preserve published links across project renames.
-const SHARE_DOMAIN_V1 = Buffer.from("7468726f7567682d6d792d657965733a73686172653a", "hex");
+const SHARE_DOMAIN_V1 = Buffer.from(
+  "7468726f7567682d6d792d657965733a73686172653a",
+  "hex",
+);
 export function shareTokenFor(authorToken: string, memoryId: string): string {
   return createHmac("sha256", authorToken)
     .update(SHARE_DOMAIN_V1)
@@ -64,4 +67,29 @@ export function authorTokenFrom(request: Request, id: string): string {
       .find((x) => x.startsWith(`${name}=`))
       ?.slice(name.length + 1) || ""
   );
+}
+
+export function perspectiveInviteToken(
+  ownerToken: string,
+  linkId: string,
+): string {
+  return createHmac("sha256", ownerToken)
+    .update(`momentas:invite:v1:${linkId}`)
+    .digest("base64url");
+}
+export function perspectiveContributorToken(
+  inviteToken: string,
+  linkId: string,
+): string {
+  return createHmac("sha256", inviteToken)
+    .update(`momentas:contributor:v1:${linkId}`)
+    .digest("base64url");
+}
+export function perspectiveComparisonToken(
+  contributorToken: string,
+  linkId: string,
+): string {
+  return createHmac("sha256", contributorToken)
+    .update(`momentas:comparison:v1:${linkId}`)
+    .digest("base64url");
 }

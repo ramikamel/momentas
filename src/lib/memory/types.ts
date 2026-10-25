@@ -1,3 +1,10 @@
+import type {
+  ConnectionStore,
+  NarrationView,
+  PinDraft,
+  PublicPin,
+  PerspectiveLink,
+} from "./connections";
 export type SourcedDetail = { text: string; sourceQuote: string };
 export type ScenePlan = {
   setting: SourcedDetail | null;
@@ -13,6 +20,7 @@ export type ApprovedScene = {
   confirmed: true;
 };
 export type DraftInput = {
+  narrationId?: string | null;
   title: string;
   authorName: string;
   recipientName: string;
@@ -29,6 +37,9 @@ export type ImageVersion = {
   createdAt: string;
 };
 export type MemoryMessage = {
+  pinContext?: PublicPin | null;
+  publicationId?: string | null;
+  pinId?: string | null;
   id: string;
   memoryId: string;
   versionId: string;
@@ -46,6 +57,8 @@ export type RenderInput = {
   instruction: string | null;
 };
 export type MemoryRecord = DraftInput & {
+  narrationId?: string | null;
+  currentPublicationId?: string | null;
   id: string;
   authorTokenHash: string;
   shareTokenHash: string | null;
@@ -58,6 +71,19 @@ export type MemoryRecord = DraftInput & {
 };
 export type ImageVersionView = ImageVersion & { imageUrl: string };
 export type AuthorMemoryView = DraftInput & {
+  currentPublicationId?: string | null;
+  narrationId?: string | null;
+  narrations?: NarrationView[];
+  pinsByVersion?: Record<string, PinDraft[]>;
+  perspective?: {
+    id: string;
+    eventLabel: string;
+    role: "original" | "contributor";
+    inviteUrl: string | null;
+    comparisonUrl: string;
+    attached: boolean;
+    synthesisStatus: PerspectiveLink["synthesisStatus"];
+  } | null;
   id: string;
   createdAt: string;
   versions: ImageVersionView[];
@@ -67,6 +93,9 @@ export type AuthorMemoryView = DraftInput & {
   shareUrl: string | null;
 };
 export type PublishedMemoryView = {
+  publicationId?: string;
+  pins?: PublicPin[];
+  narration?: NarrationView | null;
   title: string;
   authorName: string;
   recipientName: string;
@@ -85,8 +114,9 @@ export type RenderRequest = {
   versionId: string | null;
 };
 export type RenderReservation =
-  { kind: "reserved" } | { kind: "completed"; version: ImageVersion };
-export type Store = {
+  | { kind: "reserved" }
+  | { kind: "completed"; version: ImageVersion };
+export type Store = ConnectionStore & {
   createMemory(memory: MemoryRecord): Promise<void>;
   getMemory(id: string): Promise<MemoryRecord | null>;
   updateMemory(id: string, update: Partial<MemoryRecord>): Promise<void>;
