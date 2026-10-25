@@ -1,0 +1,84 @@
+.comparison-page {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 44px 40px 64px;
+}
+.comparison-page h1 {
+  font: 400 clamp(30px, 4vw, 48px) / 1.15 var(--font-story);
+  letter-spacing: -0.04em;
+  margin: 0 0 32px;
+  color: var(--ink);
+}
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+}
+.comparison-figure {
+  margin: 0;
+  min-width: 0;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.comparison-figure img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: contain;
+  background: var(--surface-soft);
+}
+.comparison-figure figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 14px;
+  padding: 14px 8px 8px;
+  overflow-wrap: anywhere;
+}
+.comparison-figure strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.comparison-figure figcaption span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.comparison-waiting {
+  padding: 24px 0;
+}
+.comparison-waiting p {
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.comparison-page > .conn-error {
+  margin-bottom: 18px;
+}
+@media (max-width: 600px) {
+  .comparison-page {
+    padding: 30px 20px 40px;
+  }
+  .comparison-page h1 {
+    margin-bottom: 24px;
+  }
+  .comparison-grid {
+    gap: 12px;
+  }
+  .comparison-figure {
+    padding: 4px;
+  }
+  .comparison-figure figcaption {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 5px 7px;
+  }
+  .comparison-figure strong {
+    font-size: 14px;
+  }
+  .comparison-figure figcaption span {
+    font-size: 11px;
+  }
+}

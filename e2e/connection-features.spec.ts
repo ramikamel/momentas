@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 test.use({
   launchOptions: {
     args: [
@@ -31,15 +32,16 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   ).toBeVisible();
   await page.waitForTimeout(1400);
   await page.getByRole("button", { name: /Stop recording/ }).click();
-  await expect(page.getByLabel("Tell it as you remember it")).toHaveValue(
-    "Dad taught me to ride my bike in the parking lot.",
-    { timeout: 15000 },
-  );
+  await expect
+    .poll(async () =>
+      page.getByLabel("Tell it as you remember it").inputValue(),
+    )
+    .toContain("Dad taught me to ride my bike in the parking lot.");
   await page.getByRole("button", { name: "Add details", exact: true }).click();
   await page.getByRole("button", { name: "Visualize this memory" }).click();
   await expect(page.getByText("1 saved image", { exact: true })).toBeVisible();
   await page
-    .getByRole("button", { name: "＋ Add a detail", exact: true })
+    .getByRole("button", { name: "＋ Place a simple pin", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Choose a spot for your detail" })
@@ -75,7 +77,10 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
     .getByRole("button", { name: "Invite another perspective", exact: true })
     .click();
   await expect(
-    page.getByText("Share this invitation with the person who was there."),
+    page.getByRole("button", {
+      name: "Copy perspective invitation",
+      exact: true,
+    }),
   ).toBeVisible();
   const state = await (await page.request.get(`/api/memories/${mid}`)).json();
   const invite = state.perspective.inviteUrl,
@@ -92,6 +97,28 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   expect(neutral).not.toHaveProperty("story");
   expect(neutral).not.toHaveProperty("imageUrl");
   await recipient.goto(invite);
+  await expect(
+    recipient.getByLabel("Your name", { exact: true }),
+  ).toBeVisible();
+  await mkdir("output/style-consistency", { recursive: true });
+  await recipient.setViewportSize({ width: 1440, height: 1000 });
+  await recipient.screenshot({
+    path: "output/style-consistency/invitation-desktop.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  await recipient.setViewportSize({ width: 390, height: 844 });
+  await recipient.screenshot({
+    path: "output/style-consistency/invitation-mobile.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  expect(
+    await recipient.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await recipient.setViewportSize({ width: 1440, height: 1000 });
   await recipient.getByLabel("Your name", { exact: true }).fill("Dad");
   await recipient
     .getByRole("button", { name: "Begin my perspective", exact: false })
@@ -124,35 +151,62 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   await recipient
     .getByRole("button", { name: "Publish this memory", exact: true })
     .click();
+  await expect(
+    recipient.getByText(
+      "Share this published version. Later edits stay private.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    recipient.getByText(
+      "Comparisons keep the versions both people chose to share.",
+      { exact: false },
+    ),
+  ).toHaveCount(0);
   await recipient
     .getByRole("button", {
-      name: "Add this version to our comparison",
+      name: "Add my perspective",
       exact: true,
     })
     .click();
-  await recipient
-    .getByRole("button", { name: "Create comparison insights", exact: true })
-    .click();
-  await expect
-    .poll(async () => {
-      const m = await (
-        await recipient.request.get(`/api/memories/${childId}`)
-      ).json();
-      return m.perspective.synthesisStatus;
-    })
-    .toBe("complete");
+  await expect(
+    recipient.getByRole("link", {
+      name: "View both perspectives",
+      exact: true,
+    }),
+  ).toHaveAttribute("href", compare);
   await recipient.goto(compare);
-  await recipient
-    .getByRole("button", { name: "Reveal our perspectives", exact: false })
-    .click();
   await expect(
     recipient.getByRole("heading", {
-      name: "What your accounts bring together.",
+      name: "One memory. Two perspectives.",
+      exact: true,
     }),
   ).toBeVisible();
-  await expect(
-    recipient.getByRole("tab", { name: "Alex remembers" }),
-  ).toBeVisible();
+  await expect(recipient.getByRole("main").getByRole("img")).toHaveCount(2);
+  await expect(recipient.getByRole("tablist")).toHaveCount(0);
+  await expect(recipient.getByLabel("Your question or reflection")).toHaveCount(
+    0,
+  );
+  await recipient.screenshot({
+    path: "output/style-consistency/comparison-desktop.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  await recipient.setViewportSize({ width: 390, height: 844 });
+  await recipient.screenshot({
+    path: "output/style-consistency/comparison-mobile.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  expect(
+    await recipient.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await recipient.setViewportSize({ width: 1440, height: 1000 });
+  await expect(recipient.locator("audio")).toHaveCount(0);
+  // Conversations and voice remain on the normal recipient view.
+  await recipient.goto(state.shareUrl);
   await expect(recipient.locator("audio")).toHaveCount(1);
   await recipient.getByRole("button", { name: /Explore detail 1/ }).click();
   await recipient
@@ -167,7 +221,7 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
     .click();
   await expect(
     recipient
-      .locator(".conn-message")
+      .locator("article.message")
       .getByText("Did the parking lot feel that big?", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Refresh", exact: true }).click();

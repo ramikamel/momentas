@@ -37,9 +37,9 @@ describe("grounded scene review", () => {
     expect(scenePlanSchema.safeParse({}).success).toBe(false);
     expect(
       draftSchema.safeParse({
-        title: "",
-        authorName: "",
-        recipientName: "",
+        title: " ",
+        authorName: "Sam",
+        recipientName: "Dad",
         story,
         scenePlan: null,
       }).success,

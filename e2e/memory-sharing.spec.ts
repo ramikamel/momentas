@@ -36,10 +36,75 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
   await page.getByRole("button", { name: "Make this change" }).click();
   await expect(page.getByText("2 saved images", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Share this image" }).click();
+  await page.goto(`${authorUrl}/published`);
+  await expect(
+    page.getByRole("heading", {
+      name: "This memory is not published yet.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Invite another perspective",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("link", { name: "Finish publishing", exact: true })
+    .click();
   await page
     .getByLabel("A few words to go with it")
     .fill("This is how I remember that afternoon. What do you remember?");
+  await expect(
+    page.getByRole("button", {
+      name: "Invite another perspective",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page.route(
+    "**/publish",
+    (route) =>
+      route.fulfill({
+        status: 503,
+        json: { error: "Publishing unavailable. Try again." },
+      }),
+    { times: 1 },
+  );
   await page.getByRole("button", { name: "Publish this memory" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Publishing unavailable" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Your memory is published.",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Publish this memory" }).click();
+  await expect(page).toHaveURL(/\/memory\/[^/]+\/published$/);
+  await expect(
+    page.getByRole("heading", {
+      name: "Your memory is published.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByLabel("A few words to go with it")).toHaveCount(0);
+  await expect(
+    page.getByLabel("A neutral name for the shared event"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Invite another perspective",
+      exact: true,
+    }),
+  ).toBeEnabled();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", {
+      name: "Your memory is published.",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     page.getByRole("textbox", { name: "Share link", exact: true }),
   ).toBeVisible();
@@ -88,7 +153,7 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
   await page.getByRole("button", { name: "Tell the memory" }).click();
   await page.getByLabel("Give this memory a title").fill("PRIVATE DRAFT TITLE");
   await page.getByRole("button", { name: "Save draft" }).click();
-  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(page.locator(".busy")).toHaveCount(0);
   await recipient.reload();
   await expect(
     recipient.getByRole("heading", { name: "The day you let go" }),
@@ -117,6 +182,9 @@ test("memory review, failed edit recovery, sharing, and a human conversation", a
     },
   });
   await page.reload();
+  await page
+    .getByRole("button", { name: "Shape the image", exact: false })
+    .click();
   await expect(
     page.getByRole("heading", { name: "A little closer to how it felt." }),
   ).toBeVisible();

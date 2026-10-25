@@ -3,226 +3,347 @@ import { useState, useRef, useEffect } from "react";
 import { normalizeRecording } from "@/lib/memory/audio";
 import type { NarrationView } from "@/lib/memory/connections";
 import "./connections.css";
-export function VoiceRecorder({
-  memoryId,
-  ensureMemory,
-  onUse,
-}: {
+
+type Props = {
   memoryId?: string;
   ensureMemory?: () => Promise<string>;
-  onUse: (v: { story: string; narrationId: string }) => void;
-}) {
-  const [recording, setRecording] = useState(false),
-    [elapsed, setElapsed] = useState(0),
-    [wav, setWav] = useState<Uint8Array | null>(null),
-    [url, setUrl] = useState(""),
-    [busy, setBusy] = useState(false),
-    [status, setStatus] = useState(""),
-    [error, setError] = useState("");
-  const recorder = useRef<MediaRecorder | null>(null),
-    stream = useRef<MediaStream | null>(null),
-    timer = useRef<ReturnType<typeof setInterval> | null>(null),
-    alive = useRef(true),
-    memory = useRef(memoryId || "");
+  onUse: (value: {
+    story: string;
+    narrationId: string;
+  }) => void | Promise<void>;
+  onSelect?: (id: string) => void;
+  onUploaded?: (value: { narrationId: string }) => Promise<void>;
+  resumeNarrationId?: string;
+  onBusyChange?: (busy: boolean) => void;
+};
+
+export function VoiceRecorder(props: Props) {
+  const [recording, setRecording] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [wav, setWav] = useState<Uint8Array | null>(null);
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState("");
+  const [complete, setComplete] = useState(false);
+  const { onBusyChange } = props;
+  const callbacks = useRef(props);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const alive = useRef(true);
+  const locked = useRef(false);
+  const request = useRef<AbortController | null>(null);
+  const uploaded = useRef<{
+    memoryId: string;
+    narration: Pick<NarrationView, "id">;
+    attached: boolean;
+    callbacks: Props;
+  } | null>(null);
+  const captureCallbacks = useRef<Props | null>(null);
   useEffect(() => {
-    memory.current = memoryId || memory.current;
-  }, [memoryId]);
+    callbacks.current = props;
+  }, [props]);
+  useEffect(() => {
+    onBusyChange?.(recording || starting || busy);
+  }, [recording, starting, busy, onBusyChange]);
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
+      request.current?.abort();
       if (timer.current) clearInterval(timer.current);
-      if (recorder.current?.state === "recording") recorder.current.stop();
-      stream.current?.getTracks().forEach((t) => t.stop());
+      const active = recorder.current;
+      if (active) {
+        active.onstop = null;
+        active.onerror = null;
+        active.ondataavailable = null;
+        if (active.state !== "inactive") active.stop();
+      }
+      stream.current?.getTracks().forEach((track) => track.stop());
+      callbacks.current.onBusyChange?.(false);
     };
   }, []);
   useEffect(() => {
-    if (!wav) {
-      setUrl("");
-      return;
-    }
+    if (!wav) return;
     const value = URL.createObjectURL(
       new Blob([new Uint8Array(wav)], { type: "audio/wav" }),
     );
     setUrl(value);
     return () => URL.revokeObjectURL(value);
   }, [wav]);
+
   function stop() {
     if (timer.current) clearInterval(timer.current);
+    timer.current = null;
     if (recorder.current?.state === "recording") recorder.current.stop();
-    stream.current?.getTracks().forEach((t) => t.stop());
-    setRecording(false);
+    stream.current?.getTracks().forEach((track) => track.stop());
+    stream.current = null;
+    if (alive.current) setRecording(false);
   }
-  async function transcribe(bytes: Uint8Array) {
-    setBusy(true);
+
+  async function transcribe(bytes?: Uint8Array) {
     setError("");
-    setStatus("Writing down what you said…");
+    const controller = new AbortController();
+    request.current = controller;
     try {
-      let id = memory.current;
-      if (!id) {
-        if (!ensureMemory) throw new Error("Save the memory before recording.");
-        id = await ensureMemory();
-        memory.current = id;
+      let clip = uploaded.current;
+      if (
+        !clip &&
+        callbacks.current.resumeNarrationId &&
+        callbacks.current.memoryId
+      ) {
+        clip = {
+          memoryId: callbacks.current.memoryId,
+          narration: { id: callbacks.current.resumeNarrationId },
+          attached: true,
+          callbacks: callbacks.current,
+        };
+        uploaded.current = clip;
       }
-      const body = new FormData();
-      body.set(
-        "audio",
-        new Blob([new Uint8Array(bytes)], { type: "audio/wav" }),
-        "memory.wav",
-      );
-      const uploaded = await fetch(`/api/memories/${id}/narrations`, {
-        method: "POST",
-        body,
-      });
-      const narration = await uploaded.json();
-      if (!uploaded.ok) throw new Error(narration.error);
-      const r = await fetch(
-        `/api/memories/${id}/narrations/${(narration as NarrationView).id}/transcribe`,
+      if (!clip) {
+        const frozen = captureCallbacks.current ?? callbacks.current;
+        const memoryId = frozen.memoryId ?? (await frozen.ensureMemory?.());
+        if (!alive.current) return;
+        if (!memoryId)
+          throw new Error("Could not prepare your memory. Please try again.");
+        if (!bytes) throw new Error("Choose a saved recording to resume.");
+        const body = new FormData();
+        body.set(
+          "audio",
+          new Blob([new Uint8Array(bytes)], { type: "audio/wav" }),
+          "memory.wav",
+        );
+        const response = await fetch(`/api/memories/${memoryId}/narrations`, {
+          method: "POST",
+          body,
+          signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok)
+          throw new Error(
+            data.error || "Could not save your recording. Please retry.",
+          );
+        if (!alive.current) return;
+        clip = {
+          memoryId,
+          narration: data as NarrationView,
+          attached: false,
+          callbacks: frozen,
+        };
+        uploaded.current = clip;
+      }
+      if (!clip.attached) {
+        await clip.callbacks.onUploaded?.({ narrationId: clip.narration.id });
+        clip.attached = true;
+        if (!alive.current) return;
+      }
+      const response = await fetch(
+        `/api/memories/${clip.memoryId}/narrations/${clip.narration.id}/transcribe`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ requestId: crypto.randomUUID() }),
+          signal: controller.signal,
         },
       );
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error);
-      const story = String(data.transcript ?? "").trim();
-      if (!story)
+      const data = await response.json();
+      if (!response.ok)
         throw new Error(
-          "No words were heard. Record again, or type the memory below.",
+          data.error ||
+            "Could not transcribe. Your recording is saved; please retry.",
         );
-      if (alive.current) {
-        onUse({ story, narrationId: data.id });
-        setStatus("Your words are in the memory below. You can edit them there.");
-      }
-    } catch (e) {
+      if (!alive.current) return;
+      const narration = data as NarrationView;
+      uploaded.current = { ...clip, narration };
+      if (!narration.transcript?.trim())
+        throw new Error(
+          "No words were found. Try transcription again or record a new clip.",
+        );
+      await clip.callbacks.onUse({
+        story: narration.transcript,
+        narrationId: narration.id,
+      });
+      if (alive.current) setComplete(true);
+    } catch (cause) {
       if (alive.current)
         setError(
-          e instanceof Error
-            ? e.message
-            : "Could not transcribe. Your words are still here.",
+          cause instanceof Error
+            ? cause.message
+            : "Could not transcribe. Your recording is still here.",
         );
-      if (alive.current) setStatus("");
     } finally {
       if (alive.current) setBusy(false);
+      locked.current = false;
     }
   }
+
   async function start() {
+    if (locked.current) return;
     setError("");
-    setStatus("");
     if (
       !navigator.mediaDevices?.getUserMedia ||
-      typeof MediaRecorder === "undefined"
+      typeof MediaRecorder === "undefined" ||
+      typeof AudioContext === "undefined"
     ) {
       setError(
         "Recording is not supported here. You can still type your memory.",
       );
       return;
     }
+    locked.current = true;
+    captureCallbacks.current = callbacks.current;
+    setStarting(true);
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (!alive.current) {
-        media.getTracks().forEach((t) => t.stop());
+        media.getTracks().forEach((track) => track.stop());
         return;
       }
       stream.current = media;
       const mime = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find(
-        (t) => MediaRecorder.isTypeSupported(t),
+        (type) => MediaRecorder.isTypeSupported(type),
       );
-      const r = new MediaRecorder(media, mime ? { mimeType: mime } : undefined);
-      recorder.current = r;
+      const active = new MediaRecorder(
+        media,
+        mime ? { mimeType: mime } : undefined,
+      );
+      recorder.current = active;
       const chunks: Blob[] = [];
-      r.ondataavailable = (e) => {
-        if (e.data.size) chunks.push(e.data);
+      let failed = false;
+      active.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
       };
-      r.onerror = () => {
+      active.onerror = () => {
+        failed = true;
         stop();
-        setError("Recording failed. Try again or type your memory.");
+        locked.current = false;
+        if (alive.current)
+          setError("Recording failed. Try again or type your memory.");
       };
-      r.onstop = async () => {
-        if (!alive.current) return;
+      active.onstop = async () => {
+        if (!alive.current || failed) return;
         setBusy(true);
         try {
           const normalized = await normalizeRecording(
-            new Blob(chunks, { type: r.mimeType }),
+            new Blob(chunks, { type: active.mimeType }),
           );
           if (!alive.current) return;
           setWav(normalized);
           await transcribe(normalized);
         } catch {
           if (alive.current) {
-            setBusy(false);
             setError(
               "We could not read that recording. Record at least one second, or type your memory.",
             );
+            setBusy(false);
           }
+          locked.current = false;
         }
       };
-      r.start();
+      active.start();
+      uploaded.current = null;
+      setWav(null);
+      setUrl("");
+      setComplete(false);
       setRecording(true);
       setElapsed(0);
       const began = Date.now();
       timer.current = setInterval(() => {
         const seconds = Math.floor((Date.now() - began) / 1000);
-        setElapsed(Math.min(seconds, 60));
+        if (alive.current) setElapsed(Math.min(seconds, 60));
         if (seconds >= 60) stop();
       }, 250);
     } catch {
-      stream.current?.getTracks().forEach((t) => t.stop());
-      setError(
-        "Microphone access was unavailable. You can still type your memory.",
-      );
+      stream.current?.getTracks().forEach((track) => track.stop());
+      stream.current = null;
+      locked.current = false;
+      if (alive.current)
+        setError(
+          "Microphone access was unavailable. You can still type your memory.",
+        );
+    } finally {
+      if (alive.current) setStarting(false);
     }
   }
+
   return (
-    <section className="conn-recorder">
+    <section className="conn-recorder" aria-label="Voice recording">
       <div>
         <span className="conn-eyebrow">A memory sounds like you</span>
         <h3>Tell it in your own voice.</h3>
         <p className="conn-muted">
-          Record up to a minute. When you stop, your words go straight into the
-          memory below.
+          Record up to a minute. Stop to add your words to the story below,
+          where you can edit them.
         </p>
       </div>
       <div className="conn-actions">
         <button
           type="button"
           className="conn-button"
-          disabled={busy}
+          disabled={
+            busy || starting || (!!props.resumeNarrationId && !complete)
+          }
           onClick={recording ? stop : start}
         >
           {recording
             ? `Stop recording · ${elapsed}s`
-            : wav
-              ? "Record again"
-              : "Record my memory"}
+            : starting
+              ? "Opening microphone…"
+              : wav
+                ? "Record another clip"
+                : "Record my memory"}
         </button>
-        {wav && !recording && error && (
+        {props.resumeNarrationId && !wav && !complete && (
+          <button
+            type="button"
+            className="conn-button secondary"
+            disabled={busy || starting}
+            onClick={() => {
+              if (locked.current) return;
+              locked.current = true;
+              setBusy(true);
+              void transcribe();
+            }}
+          >
+            Resume saved recording
+          </button>
+        )}
+        {wav && error && !recording && (
           <button
             type="button"
             className="conn-button secondary"
             disabled={busy}
-            onClick={() => void transcribe(wav)}
+            onClick={() => {
+              if (locked.current) return;
+              locked.current = true;
+              setBusy(true);
+              void transcribe(wav);
+            }}
           >
-            {busy ? "Writing down what you said…" : "Try again"}
+            Retry transcription
           </button>
         )}
       </div>
+      <p className="conn-small" role="status">
+        {busy
+          ? "Adding your recorded words to the story…"
+          : complete
+            ? "Your recorded words were added to the story. You can edit them below."
+            : "Your recording stays private unless you choose to publish it."}
+      </p>
       {url && <audio src={url} controls aria-label="Preview your recording" />}
-      {status && (
-        <p className="conn-small" role="status">
-          {status}
-        </p>
-      )}
       {wav && (
         <button
           className="conn-link"
           type="button"
-          disabled={busy}
+          disabled={busy || recording || starting}
           onClick={() => {
             setWav(null);
+            setUrl("");
+            setComplete(false);
             setError("");
-            setStatus("");
+            uploaded.current = null;
           }}
         >
           Discard this recording

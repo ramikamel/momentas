@@ -22,12 +22,48 @@ export function MemoryDetailPins({
       <div className="conn-image">
         <img src={imageUrl} alt={alt} />
         <DetailOutline outline={pins.find((p) => p.id === selected)?.outline} />
+        <svg
+          fillRule="evenodd"
+          className="conn-exploration-overlay"
+          viewBox="0 0 1000 1000"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}
+        >
+          {[...pins].reverse().map(
+            (pin) =>
+              pin.outline && (
+                <path
+                  key={pin.id}
+                  d={pin.outline.path}
+                  onClick={() => setSelected(pin.id)}
+                  style={{
+                    pointerEvents: "all",
+                    cursor: "pointer",
+                    fill: selected === pin.id ? "#f8d68830" : "transparent",
+                    stroke: selected === pin.id ? "#fff3cf" : "#fff3cf70",
+                    strokeWidth: 2,
+                  }}
+                />
+              ),
+          )}
+        </svg>
         {pins.map((pin, i) => (
           <button
             key={pin.id}
             type="button"
             className="conn-pin"
-            style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
+            style={{
+              left: `${pin.x * 100}%`,
+              top: `${pin.y * 100}%`,
+              zIndex: 3,
+            }}
             aria-label={`Explore detail ${i + 1}: ${pin.label}`}
             aria-pressed={selected === pin.id}
             onClick={() => setSelected(pin.id)}

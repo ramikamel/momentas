@@ -9,8 +9,7 @@ export function PerspectiveControls({
   memory: AuthorMemoryView;
   onRefresh: () => Promise<void>;
 }) {
-  const [label, setLabel] = useState("The afternoon we learned to ride"),
-    [busy, setBusy] = useState(false),
+  const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [copied, setCopied] = useState(false);
   const p = memory.perspective;
@@ -32,43 +31,24 @@ export function PerspectiveControls({
       setBusy(false);
     }
   }
+  if (!memory.currentPublicationId) return null;
   return (
     <section className="conn-perspective-controls">
-      <span className="conn-eyebrow">Same moment, two memories</span>
-      <h3>
-        {p?.role === "contributor"
-          ? "Let your perspectives meet."
-          : "How do they remember it?"}
-      </h3>
       {!p ? (
         <>
-          <p className="conn-muted">
-            Invite one person to tell their own account before seeing yours.
-            Your current published version becomes your side of the comparison.
-          </p>
-          <label className="conn-field">
-            A neutral name for the shared event
-            <input
-              maxLength={120}
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-          </label>
           <button
             type="button"
             className="conn-button"
-            disabled={busy || !memory.currentPublicationId || !label.trim()}
-            onClick={() => act("", { eventLabel: label })}
+            disabled={busy || !memory.currentPublicationId}
+            onClick={() => act("", { eventLabel: "A shared memory" })}
           >
             Invite another perspective
           </button>
         </>
       ) : (
         <>
-          <p className="conn-muted">{p.eventLabel}</p>
           {p.role === "original" && p.inviteUrl && (
             <>
-              <p>Share this invitation with the person who was there.</p>
               <div className="conn-copy">
                 {typeof window !== "undefined"
                   ? new URL(p.inviteUrl, window.location.origin).href
@@ -95,10 +75,7 @@ export function PerspectiveControls({
           {p.role === "contributor" && !p.attached && (
             <>
               <p className="conn-control-caption">
-                Your current published image, caption, selected quotes and
-                optional recorded voice will join the comparison. This
-                comparison keeps this approved version when you later edit your
-                memory.
+                Share this published version. Later edits stay private.
               </p>
               <button
                 type="button"
@@ -111,7 +88,7 @@ export function PerspectiveControls({
                   })
                 }
               >
-                Add this version to our comparison
+                Add my perspective
               </button>
             </>
           )}
@@ -123,38 +100,14 @@ export function PerspectiveControls({
                 rel="noreferrer"
                 className="conn-button"
               >
-                Open our comparison →
+                View both perspectives
               </a>
-              {p.synthesisStatus !== "complete" && (
-                <button
-                  type="button"
-                  className="conn-button secondary"
-                  disabled={busy || p.synthesisStatus === "pending"}
-                  onClick={() =>
-                    act("/synthesis", {
-                      linkId: p.id,
-                      requestId: crypto.randomUUID(),
-                    })
-                  }
-                >
-                  {busy || p.synthesisStatus === "pending"
-                    ? "Finding the connections…"
-                    : p.synthesisStatus === "failed"
-                      ? "Retry comparison insights"
-                      : "Create comparison insights"}
-                </button>
-              )}
             </div>
-          ) : (
-            <p className="conn-small">
-              The reveal opens when the other perspective is reviewed and
-              shared.
+          ) : p.role === "original" ? (
+            <p className="conn-small perspective-waiting">
+              Waiting for their perspective.
             </p>
-          )}
-          <p className="conn-small">
-            Comparisons keep the versions both people chose to share. Later
-            drafts stay separate.
-          </p>
+          ) : null}
         </>
       )}
       {error && (

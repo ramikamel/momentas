@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Brand, Header } from "./site-header";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -26,12 +27,11 @@ import type {
   ScenePlan,
   SourcedDetail,
 } from "@/lib/memory/types";
+import "./entry-choices.css";
+import { PhotoStart } from "./photo-start";
+import { PhotoFrameWorkspace } from "./photo-frame-workspace";
+import { ReferencePhotos } from "./reference-photos";
 import { VoiceRecorder } from "./voice-recorder";
-import {
-  ReferencePhotos,
-  uploadPendingReferences,
-  type PendingReference,
-} from "./reference-photos";
 import { MemoryVoicePlayer } from "./memory-voice-player";
 import { DetailPinEditor, MemoryDetailPins } from "./memory-detail-pins";
 import { PerspectiveControls } from "./perspective-controls";
@@ -62,32 +62,6 @@ async function api<T>(
       { status: r.status, code: data.code },
     );
   return data;
-}
-function Brand() {
-  return (
-    <Link className="brand" href="/">
-      <span className="brand-mark">
-        <BookOpen size={22} />
-      </span>{" "}
-      momentas<span className="brand-period">.</span>
-    </Link>
-  );
-}
-export function Header() {
-  return (
-    <header className="header">
-      <Brand />
-      <span className="header-note">
-        A little closer to the way you remember.
-      </span>
-      <Link className="quiet-link saved-link" href="/library">
-        Saved pictures
-      </Link>
-      <Link className="quiet-link create-link" href="/#begin">
-        Create a memory <ArrowUpRight size={15} />
-      </Link>
-    </header>
-  );
 }
 function Busy({ label }: { label: string }) {
   const [seconds, setSeconds] = useState(0);
@@ -136,7 +110,10 @@ function StoryFields({
 }) {
   return (
     <>
-      <Field label="Give this memory a title">
+      <Field
+        label="Give this memory a title"
+        hint="Optional. You can add this later."
+      >
         <input
           maxLength={120}
           placeholder="The day you let go"
@@ -145,7 +122,7 @@ function StoryFields({
         />
       </Field>
       <div className="field-grid">
-        <Field label="Your name">
+        <Field label="Your name" hint="Optional">
           <input
             maxLength={80}
             placeholder="Alex"
@@ -153,7 +130,7 @@ function StoryFields({
             onChange={(e) => setDraft({ ...draft, authorName: e.target.value })}
           />
         </Field>
-        <Field label="Who is it for?">
+        <Field label="Who is it for?" hint="Optional">
           <input
             maxLength={80}
             placeholder="Dad"
@@ -182,32 +159,86 @@ function StoryFields({
     </>
   );
 }
-function SampleArt() {
-  return (
-    <div className="sample-art sample-art-output">
-      <img
-        src="/sample-memory.webp"
-        alt="Fictional AI memory reconstruction: a red bicycle in the foreground and a father cheering across an enormous parking lot, seen from the rider’s viewpoint."
-      />
-      <span className="sample-label">Fictional sample · Muse Image</span>
-    </div>
-  );
-}
 export function Landing() {
   const router = useRouter();
+  const [storyOpen, setStoryOpen] = useState(false);
+  const photoCreation = useRef<Promise<string> | null>(null);
+  async function ensurePhotoMemory() {
+    if (!photoCreation.current)
+      photoCreation.current = api<{ id: string }>("/api/memories", empty)
+        .then((v) => v.id)
+        .catch((e) => {
+          photoCreation.current = null;
+          throw e;
+        });
+    return photoCreation.current;
+  }
+  function openStory() {
+    setStoryOpen(true);
+    requestAnimationFrame(() =>
+      document.getElementById("begin")?.scrollIntoView({ behavior: "smooth" }),
+    );
+  }
   const [draft, setDraft] = useState<DraftInput>(empty),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [createdId, setCreatedId] = useState(""),
     [busyMessage, setBusyMessage] = useState(""),
-    [references, setReferences] = useState<PendingReference[]>([]);
+    [captureBusy, setCaptureBusy] = useState(false),
+    [referenceBusy, setReferenceBusy] = useState(false);
+  const latestDraft = useRef(draft),
+    draftId = useRef(""),
+    draftCreation = useRef<Promise<string> | null>(null);
+  useEffect(() => {
+    latestDraft.current = draft;
+  }, [draft]);
+  async function ensureDraft() {
+    if (draftId.current) return draftId.current;
+    if (draftCreation.current) return draftCreation.current;
+    const pending = api<{ id: string }>(
+      "/api/memories",
+      latestDraft.current,
+    ).then((r) => {
+      draftId.current = r.id;
+      setCreatedId(r.id);
+      return r.id;
+    });
+    draftCreation.current = pending;
+    try {
+      return await pending;
+    } finally {
+      draftCreation.current = null;
+    }
+  }
+  function acceptVoice(value: { story: string; narrationId: string }) {
+    const current = latestDraft.current;
+    const story = [current.story.trimEnd(), value.story.trim()]
+      .filter(Boolean)
+      .join("\n\n");
+    if (story.length > 6000)
+      throw new Error(
+        "Your recording is saved. Shorten the memory to fit these new words, then retry.",
+      );
+    const next = {
+      ...current,
+      story,
+      narrationId: value.narrationId,
+      scenePlan: null,
+    };
+    latestDraft.current = next;
+    setDraft(next);
+    if (draftId.current)
+      void api(`/api/memories/${draftId.current}`, next, "PATCH").catch(() =>
+        setError(
+          "Your words are here. Submit or save this draft again to save the latest text.",
+        ),
+      );
+  }
   const generationAttempt = useRef<{ signature: string; id: string } | null>(
-      null,
-    ),
-    draftRef = useRef(draft),
-    idRef = useRef("");
-  draftRef.current = draft;
+    null,
+  );
   function sample() {
+    openStory();
     setDraft({
       title: "The day you let go",
       authorName: "Alex",
@@ -227,16 +258,11 @@ export function Landing() {
     setError("");
     setBusyMessage("Saving your memory");
     try {
-      let id = idRef.current || createdId;
+      let id = createdId;
       if (!id) {
-        const r = await api<{ id: string }>("/api/memories", draft);
-        id = r.id;
-        idRef.current = id;
-        setCreatedId(id);
+        id = await ensureDraft();
       } else if (generationAttempt.current?.signature !== JSON.stringify(draft))
         await api(`/api/memories/${id}`, draft, "PATCH");
-      const savedReferences = await uploadPendingReferences(id, references);
-      setReferences(savedReferences);
       if (mode === "details") {
         setBusyMessage("Finding the details in your memory");
         await api(`/api/memories/${id}/scene`, { story: draft.story });
@@ -259,148 +285,132 @@ export function Landing() {
       setBusy(false);
     }
   }
-  async function ensureMemory() {
-    if (idRef.current) return idRef.current;
-    const r = await api<{ id: string }>("/api/memories", {
-      ...draftRef.current,
-      scenePlan: null,
-    });
-    idRef.current = r.id;
-    setCreatedId(r.id);
-    return r.id;
-  }
   return (
     <>
       <Header />
       <main>
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow">
-              <span /> FOR THE MOMENTS THAT STAY
-            </div>
+        <section className="entry-home" id="choose">
+          <header className="entry-heading">
+            <div className="eyebrow">For the moments that stay</div>
             <h1>
-              Some memories
-              <br />
-              deserve to be <em>seen.</em>
+              Every memory has <em>more to it.</em>
             </h1>
             <p>
-              You remember more than what happened.
-              <br className="desktop-break" /> You remember how it felt. Turn
-              your memory into a lifelike scene, then share it with someone who
-              matters.
+              A photograph can open a story. A story can become a picture.
+              <br className="desktop-break" /> Choose where yours begins.
             </p>
-            <Link className="button primary" href="#begin">
-              Start a memory <ArrowRight size={18} />
-            </Link>
-            <button className="sample-button" onClick={sample}>
-              Try a sample memory <ArrowUpRight size={15} />
-            </button>
-            <div className="hero-footnote">
-              <Heart size={14} /> Your perspective. Your words. A new
-              conversation.
-            </div>
-          </div>
-          <div className="hero-art">
-            <SampleArt />
-            <div className="art-caption">
-              <span>
-                “I didn’t know you’d let go.
-                <br />I only knew I was flying.”
-              </span>
-              <span>01 / A MEMORY OF LEARNING</span>
-            </div>
-          </div>
-        </section>
-        <section className="how">
-          <div>
-            <span className="section-number">01</span>
-            <h3>Remember it.</h3>
-            <p>Write it down, or tell it in your own voice.</p>
-          </div>
-          <div>
-            <span className="section-number">02</span>
-            <h3>Make it yours.</h3>
-            <p>Recreate the moment. Leave details someone can discover.</p>
-          </div>
-          <div>
-            <span className="section-number">03</span>
-            <h3>Let them in.</h3>
-            <p>
-              Invite their side of the story. Find what you remember together.
-            </p>
-          </div>
-        </section>
-        <section className="begin-section" id="begin">
-          <div className="begin-intro">
-            <div className="eyebrow">A PLACE TO BEGIN</div>
-            <h2>
-              What takes you
-              <br /> <em>back?</em>
-            </h2>
-            <p>
-              It doesn’t have to be a big moment.
-              <br />
-              Sometimes the small ones hold everything.
-            </p>
-            <span className="hand-note">
-              Let me show you
-              <br />
-              how I remember it.
-            </span>
-          </div>
-          <form className="paper form-card" onSubmit={create}>
-            <VoiceRecorder
-              memoryId={createdId}
-              ensureMemory={ensureMemory}
-              onUse={(value) =>
-                setDraft({
-                  ...draftRef.current,
-                  story: value.story,
-                  narrationId: value.narrationId,
-                  scenePlan: null,
-                })
+          </header>
+          <div className="entry-choices">
+            <PhotoStart
+              ensureMemory={ensurePhotoMemory}
+              onReady={(memoryId, version) =>
+                router.push(`/memory/${memoryId}?image=${version.id}`)
               }
             />
-            <StoryFields draft={draft} setDraft={setDraft} />
-            <ReferencePhotos
-              memoryId={createdId || null}
-              references={references}
-              onChange={setReferences}
-              disabled={busy}
-            />
-            <ErrorNotice error={error} />
-            <button
-              disabled={busy}
-              className="button primary wide"
-              type="submit"
-            >
-              {busy ? "Working on your memory…" : "Submit & generate image"}
-              <ArrowRight size={18} />
-            </button>
-            <button
-              type="button"
-              className="button subtle wide"
-              disabled={busy}
-              onClick={(e) => {
-                if (e.currentTarget.form?.reportValidity())
-                  void createMode("details");
-              }}
-            >
-              Add details
-            </button>
-            {busy && <Busy label={busyMessage || "Saving your memory"} />}
-            {createdId && !busy && (
-              <Link className="quiet-link" href={`/memory/${createdId}`}>
-                Open saved draft →
-              </Link>
-            )}
-            <p className="form-note">
-              Your draft stays private. You decide when to share.
-              <br />
-              Editing is available in this browser.
-            </p>
-          </form>
+            <section className="entry-story" aria-label="Start from a memory">
+              <div className="entry-story-art" aria-hidden="true">
+                <Feather size={34} />
+                <p>
+                  “I remember it
+                  <br />
+                  <em>like it was yesterday.”</em>
+                </p>
+                <span>The things a camera couldn’t keep</span>
+              </div>
+              <div className="entry-card-copy">
+                <span className="eyebrow">Start with your words</span>
+                <h2>Bring a memory to life.</h2>
+                <p>
+                  No photograph? Tell the moment as you remember it, and turn
+                  your words into a lifelike scene.
+                </p>
+                <button className="button primary" onClick={openStory}>
+                  Start with a memory <ArrowRight size={17} />
+                </button>
+                <button className="sample-button" onClick={sample}>
+                  Try a sample memory <ArrowUpRight size={15} />
+                </button>
+              </div>
+            </section>
+          </div>
+          <p className="entry-footnote">
+            <Heart size={14} /> Your perspective. Your words. A little closer to
+            someone.
+          </p>
         </section>
+        {storyOpen && (
+          <>
+            <section className="begin-section" id="begin">
+              <div className="begin-intro">
+                <div className="eyebrow">A place to begin</div>
+                <h2>
+                  What takes you
+                  <br /> <em>back?</em>
+                </h2>
+                <p>
+                  It doesn’t have to be a big moment.
+                  <br />
+                  Sometimes the small ones hold everything.
+                </p>
+                <span className="hand-note">
+                  Let me show you
+                  <br />
+                  how I remember it.
+                </span>
+              </div>
+              <form className="paper form-card" onSubmit={create}>
+                <fieldset disabled={busy} className="capture-fields">
+                  <VoiceRecorder
+                    memoryId={createdId || undefined}
+                    ensureMemory={ensureDraft}
+                    onUse={acceptVoice}
+                    onSelect={(narrationId) =>
+                      setDraft((d) => ({ ...d, narrationId }))
+                    }
+                    onBusyChange={setCaptureBusy}
+                  />
+                  <StoryFields draft={draft} setDraft={setDraft} />
+                  <ReferencePhotos
+                    memoryId={createdId || undefined}
+                    ensureMemory={ensureDraft}
+                    onBusyChange={setReferenceBusy}
+                  />
+                </fieldset>
+                <ErrorNotice error={error} />
+                <button
+                  disabled={busy || captureBusy || referenceBusy}
+                  className="button primary wide"
+                  type="submit"
+                >
+                  {busy ? "Working on your memory…" : "Submit & generate image"}
+                  <ArrowRight size={18} />
+                </button>
+                <button
+                  type="button"
+                  className="button subtle wide"
+                  disabled={busy || captureBusy || referenceBusy}
+                  onClick={(e) => {
+                    if (e.currentTarget.form?.reportValidity())
+                      void createMode("details");
+                  }}
+                >
+                  Add details
+                </button>
+                {busy && <Busy label={busyMessage || "Saving your memory"} />}
+                {createdId && !busy && (
+                  <Link className="quiet-link" href={`/memory/${createdId}`}>
+                    Open saved draft →
+                  </Link>
+                )}
+                <p className="form-note">
+                  Your draft stays private. You decide when to share.
+                  <br />
+                  Editing is available in this browser.
+                </p>
+              </form>
+            </section>
+          </>
+        )}
       </main>
       <footer>
         <Brand />
@@ -540,10 +550,15 @@ function MessageList({
 export function Workspace({
   id,
   initialVersionId,
+  initialStage,
+  publishedView = false,
 }: {
   id: string;
   initialVersionId?: string;
+  initialStage?: number;
+  publishedView?: boolean;
 }) {
+  const router = useRouter();
   const [memory, setMemory] = useState<AuthorMemoryView | null>(null),
     [draft, setDraft] = useState<DraftInput>(empty),
     [stage, setStage] = useState(0),
@@ -558,7 +573,12 @@ export function Workspace({
     [shareUrl, setShareUrl] = useState(""),
     [copied, setCopied] = useState(false),
     [reply, setReply] = useState<Record<string, string>>({}),
-    [references, setReferences] = useState<PendingReference[]>([]);
+    [captureBusy, setCaptureBusy] = useState(false),
+    [referenceBusy, setReferenceBusy] = useState(false);
+  const latestDraft = useRef(draft);
+  useEffect(() => {
+    latestDraft.current = draft;
+  }, [draft]);
   const generationAttempt = useRef<{ signature: string; id: string } | null>(
     null,
   );
@@ -578,19 +598,25 @@ export function Workspace({
             scenePlan: m.scenePlan,
           });
           const chosen =
-            m.versions.find((v) => v.id === initialVersionId) ||
-            m.versions.at(-1);
+            m.versions.find(
+              (v) =>
+                v.id ===
+                (publishedView ? m.publishedVersionId : initialVersionId),
+            ) || m.versions.at(-1);
           setSelected(chosen?.id || "");
           setApproved(
             !!m.scenePlan &&
               JSON.stringify(m.scenePlan) ===
                 JSON.stringify(chosen?.scene.plan),
           );
-          setStage(m.versions.length ? 2 : m.scenePlan ? 1 : 0);
+          setStage(
+            publishedView
+              ? 3
+              : (initialStage ?? (m.versions.length ? 2 : m.scenePlan ? 1 : 0)),
+          );
           setCaption(m.publishedCaption || "");
           setShareUrl(m.shareUrl || "");
           setAdditions(chosen?.scene.authorAdditions || "");
-          setReferences(m.visualReferences ?? []);
           if (initialVersionId && chosen) {
             setDraft((d) => ({ ...d, scenePlan: chosen.scene.plan }));
             setApproved(true);
@@ -600,7 +626,7 @@ export function Workspace({
         setError((e as Error).message);
       }
     },
-    [base, initialVersionId],
+    [base, initialVersionId, initialStage, publishedView],
   );
   useEffect(() => {
     void load(true);
@@ -685,6 +711,36 @@ export function Workspace({
     );
   }
   const version = memory?.versions.find((v) => v.id === selected);
+  const source = memory?.versions.find((v) => v.origin === "source");
+  const publishedVersion = memory?.versions.find(
+    (v) => v.id === memory.publishedVersionId,
+  );
+  if (memory && source && stage !== 3 && !publishedView)
+    return (
+      <>
+        <Header />
+        <PhotoFrameWorkspace
+          memory={memory}
+          source={source}
+          initialVersionId={initialVersionId}
+          onGenerated={(v) =>
+            setMemory((m) =>
+              m
+                ? {
+                    ...m,
+                    versions: [...m.versions.filter((x) => x.id !== v.id), v],
+                  }
+                : m,
+            )
+          }
+          onShare={async (v) => {
+            await load(true);
+            setSelected(v.id);
+            setStage(3);
+          }}
+        />
+      </>
+    );
   return (
     <>
       <Header />
@@ -711,11 +767,17 @@ export function Workspace({
                 className={stage === i ? "active" : ""}
                 disabled={
                   !!busy ||
+                  captureBusy ||
+                  referenceBusy ||
                   !memory ||
                   (i === 1 && !draft.scenePlan) ||
                   (i > 1 && !memory?.versions.length)
                 }
-                onClick={() => setStage(i)}
+                onClick={() =>
+                  publishedView
+                    ? router.push(`/memory/${id}?step=${i}`)
+                    : setStage(i)
+                }
                 key={s}
               >
                 <span>
@@ -772,6 +834,144 @@ export function Workspace({
                     : "Finding your saved words and images."}
                 </p>
               </div>
+            ) : publishedView ? (
+              memory.currentPublicationId && shareUrl ? (
+                <>
+                  <div className="published-heading">
+                    <span className="published-check" aria-hidden="true">
+                      <CheckCheck size={26} />
+                    </span>
+                    <div>
+                      <p className="published-status" role="status">
+                        Published
+                      </p>
+                      <h1>Your memory is published.</h1>
+                    </div>
+                  </div>
+                  <div className="published-layout">
+                    <figure className="published-photo">
+                      {publishedVersion && (
+                        <img
+                          src={publishedVersion.imageUrl}
+                          alt="Published memory"
+                        />
+                      )}
+                      <figcaption>{memory.publishedCaption}</figcaption>
+                    </figure>
+                    <section
+                      className="published-sharing"
+                      aria-label="Share your published memory"
+                    >
+                      <h2>Share this moment.</h2>
+                      <div className="share-result">
+                        <div className="copy-row">
+                          <input
+                            readOnly
+                            aria-label="Share link"
+                            value={shareUrl}
+                          />
+                          <button
+                            aria-label="Copy share link"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(
+                                  new URL(shareUrl, window.location.origin)
+                                    .href,
+                                );
+                                setCopied(true);
+                              } catch {
+                                setError(
+                                  "Copy the link from the field to share it.",
+                                );
+                              }
+                            }}
+                          >
+                            {copied ? <Check size={18} /> : <Copy size={18} />}
+                          </button>
+                        </div>
+                        <Link
+                          className="quiet-link"
+                          href={shareUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open the recipient view <ArrowUpRight size={15} />
+                        </Link>
+                      </div>
+
+                      <PerspectiveControls
+                        memory={memory}
+                        onRefresh={() => load()}
+                      />
+                      <Link
+                        className="published-edit"
+                        href={`/memory/${id}?step=3`}
+                      >
+                        Edit shared memory
+                      </Link>
+                    </section>
+                  </div>
+                  <section className="conversation">
+                    <div className="conversation-heading">
+                      <div>
+                        <div className="eyebrow">
+                          THE CONVERSATION CONTINUES
+                        </div>
+                        <h2>What this brings back.</h2>
+                      </div>
+                      <button
+                        className="button subtle"
+                        onClick={() =>
+                          run("Refreshing the conversation", () => load())
+                        }
+                      >
+                        <RefreshCw size={15} /> Refresh
+                      </button>
+                    </div>
+                    <p className="muted small">
+                      Questions and replies come from real people. Refresh to
+                      see new messages.
+                    </p>
+                    {memory.messages.length ? (
+                      <MessageList
+                        messages={memory.messages}
+                        versions={memory.versions}
+                        reply={reply}
+                        onReply={(parentId, text) => {
+                          if (text !== undefined) {
+                            setReply({ ...reply, [parentId]: text });
+                            return;
+                          }
+                          void run("Sending your reply", async () => {
+                            await api(`${base}/reply`, {
+                              parentId,
+                              text: reply[parentId],
+                            });
+                            setReply({ ...reply, [parentId]: "" });
+                            await load();
+                          });
+                        }}
+                      />
+                    ) : (
+                      <div className="conversation-empty">
+                        <MessageCircle size={25} />
+                        <p>Every memory can begin a conversation.</p>
+                        <span>Share your link and invite a question.</span>
+                      </div>
+                    )}
+                  </section>
+                </>
+              ) : (
+                <div className="page-heading">
+                  <h1>This memory is not published yet.</h1>
+                  <Link
+                    className="button primary"
+                    href={`/memory/${id}?step=3`}
+                  >
+                    Finish publishing
+                  </Link>
+                </div>
+              )
             ) : stage === 0 ? (
               <>
                 <div className="page-heading">
@@ -787,22 +987,43 @@ export function Workspace({
                 >
                   <VoiceRecorder
                     memoryId={id}
+                    onBusyChange={setCaptureBusy}
                     onUse={(value) => {
-                      setDraft((current) => ({
+                      const current = latestDraft.current;
+                      const story = [
+                        current.story.trimEnd(),
+                        value.story.trim(),
+                      ]
+                        .filter(Boolean)
+                        .join("\n\n");
+                      if (story.length > 6000)
+                        throw new Error(
+                          "Your recording is saved. Shorten the memory before adding more words.",
+                        );
+                      const next = {
                         ...current,
-                        story: value.story,
+                        story,
                         narrationId: value.narrationId,
                         scenePlan: null,
-                      }));
+                      };
+                      latestDraft.current = next;
+                      setDraft(next);
                       setApproved(false);
+                      void api(base, next, "PATCH").catch(() =>
+                        setError(
+                          "Your words are here. Save your draft again to save the latest text.",
+                        ),
+                      );
                     }}
+                    onSelect={(narrationId) =>
+                      setDraft((d) => ({ ...d, narrationId }))
+                    }
                   />
                   <StoryFields draft={draft} setDraft={setDraft} />
                   <ReferencePhotos
                     memoryId={id}
-                    references={references}
-                    onChange={setReferences}
-                    disabled={!!busy}
+                    onBusyChange={setReferenceBusy}
+                    onChanged={() => load()}
                   />
                   <div className="action-row">
                     <button
@@ -815,7 +1036,9 @@ export function Workspace({
                     <button
                       type="button"
                       className="button subtle"
-                      disabled={!draft.story.trim()}
+                      disabled={
+                        !draft.story.trim() || captureBusy || referenceBusy
+                      }
                       onClick={() => void extract()}
                     >
                       Add details
@@ -823,7 +1046,9 @@ export function Workspace({
                     <button
                       className="button primary"
                       type="submit"
-                      disabled={!draft.story.trim()}
+                      disabled={
+                        !draft.story.trim() || captureBusy || referenceBusy
+                      }
                     >
                       Submit & generate image <ArrowRight size={17} />
                     </button>
@@ -1019,7 +1244,9 @@ export function Workspace({
                         </span>
                         <h2>{draft.title}</h2>
                         <p>
-                          An AI memory reconstruction, shaped by{" "}
+                          {version.origin === "source"
+                            ? "An original photograph, with stories from "
+                            : "An AI reconstruction from recollections by "}
                           {draft.authorName}.
                         </p>
                       </div>
@@ -1078,7 +1305,7 @@ export function Workspace({
                             { versionId: selected, caption, includeNarration },
                           );
                           setShareUrl(r.shareUrl);
-                          await load();
+                          router.push(`/memory/${id}/published`);
                         })
                       }
                     >
@@ -1088,95 +1315,15 @@ export function Workspace({
                       <ArrowUpRight size={17} />
                     </button>
                     {shareUrl && (
-                      <div className="share-result">
-                        <span className="success">
-                          <CheckCheck size={16} /> Your memory is ready to share
-                        </span>
-                        <div className="copy-row">
-                          <input
-                            readOnly
-                            aria-label="Share link"
-                            value={shareUrl}
-                          />
-                          <button
-                            aria-label="Copy share link"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(
-                                  new URL(shareUrl, window.location.origin)
-                                    .href,
-                                );
-                                setCopied(true);
-                              } catch {
-                                setError(
-                                  "Copy the link from the field to share it.",
-                                );
-                              }
-                            }}
-                          >
-                            {copied ? <Check size={18} /> : <Copy size={18} />}
-                          </button>
-                        </div>
-                        <Link
-                          className="quiet-link"
-                          href={shareUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Open the recipient view <ArrowUpRight size={15} />
-                        </Link>
-                      </div>
+                      <Link
+                        className="quiet-link"
+                        href={`/memory/${id}/published`}
+                      >
+                        View published memory
+                      </Link>
                     )}
                   </div>
                 </div>
-                <PerspectiveControls memory={memory} onRefresh={() => load()} />
-                <section className="conversation">
-                  <div className="conversation-heading">
-                    <div>
-                      <div className="eyebrow">THE CONVERSATION CONTINUES</div>
-                      <h2>What this brings back.</h2>
-                    </div>
-                    <button
-                      className="button subtle"
-                      onClick={() =>
-                        run("Refreshing the conversation", () => load())
-                      }
-                    >
-                      <RefreshCw size={15} /> Refresh
-                    </button>
-                  </div>
-                  <p className="muted small">
-                    Questions and replies come from real people. Refresh to see
-                    new messages.
-                  </p>
-                  {memory.messages.length ? (
-                    <MessageList
-                      messages={memory.messages}
-                      versions={memory.versions}
-                      reply={reply}
-                      onReply={(parentId, text) => {
-                        if (text !== undefined) {
-                          setReply({ ...reply, [parentId]: text });
-                          return;
-                        }
-                        void run("Sending your reply", async () => {
-                          await api(`${base}/reply`, {
-                            parentId,
-                            text: reply[parentId],
-                          });
-                          setReply({ ...reply, [parentId]: "" });
-                          await load();
-                        });
-                      }}
-                    />
-                  ) : (
-                    <div className="conversation-empty">
-                      <MessageCircle size={25} />
-                      <p>Every memory can begin a conversation.</p>
-                      <span>Share your link and invite a question.</span>
-                    </div>
-                  )}
-                </section>
               </>
             )}
           </fieldset>
@@ -1236,14 +1383,20 @@ export function SharedMemory({ token }: { token: string }) {
               </div>
               <h1>{memory.title}</h1>
               <p>
-                AI reconstruction · Shaped by {memory.authorName}, not an
-                original photograph.
+                {memory.imageOrigin === "source"
+                  ? `An original photograph · Stories from ${memory.authorName}`
+                  : `AI reconstruction from ${memory.authorName}’s recollection`}
+                .
               </p>
             </div>
             <div className="shared-image">
               <MemoryDetailPins
-                imageUrl={memory.imageUrl}
-                alt={memory.imageDescription || memory.title}
+                imageUrl={memory.sourceImageUrl || memory.imageUrl}
+                alt={
+                  memory.sourceImageUrl
+                    ? "Original photograph, unchanged"
+                    : memory.imageDescription || memory.title
+                }
                 pins={memory.pins ?? []}
                 onAsk={(pin) => {
                   setSelectedPin(pin);
@@ -1253,6 +1406,19 @@ export function SharedMemory({ token }: { token: string }) {
                 }}
               />
             </div>
+            {memory.sourceImageUrl && (
+              <figure className="shared-image">
+                <img
+                  src={memory.imageUrl}
+                  alt="AI reconstruction from the storyteller’s recollection"
+                  style={{ width: "100%" }}
+                />
+                <figcaption className="form-note">
+                  AI reconstruction from their recollection · The original
+                  photograph above remains unchanged.
+                </figcaption>
+              </figure>
+            )}
             {memory.narration && (
               <MemoryVoicePlayer narration={memory.narration} />
             )}

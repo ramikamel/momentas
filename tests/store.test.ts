@@ -239,3 +239,35 @@ test("accepts a message only while its viewed version remains published", async 
   ).rejects.toThrow();
   expect(await s.messages("m")).toHaveLength(1);
 });
+test("expired pending object maps expose failed status on read and allow retry", async () => {
+  const s = createLocalStore(dir);
+  await s.createMemory(memory());
+  await s.reserveRender("m", "render", 4);
+  await s.completeRender("m", "render", version());
+  await s.claimObjectMap("m", "v", "job", false);
+  const now = Date.now();
+  vi.spyOn(Date, "now").mockReturnValue(now + 181000);
+  expect(await s.getObjectMap("m", "v")).toMatchObject({ status: "failed" });
+  expect(await s.claimObjectMap("m", "v", "retry", true)).toMatchObject({
+    claimed: true,
+    map: { status: "pending" },
+  });
+});
+
+test("explicit refresh replaces a completed object map but cannot steal a pending scan", async () => {
+  const s = createLocalStore(dir);
+  await s.createMemory(memory());
+  await s.reserveRender("m", "render", 4);
+  await s.completeRender("m", "render", version());
+  await s.claimObjectMap("m", "v", "job", false);
+  await s.saveObjectMap("m", "v", "job", [], "complete");
+  expect(await s.claimObjectMap("m", "v", "cached", false)).toMatchObject({
+    claimed: false,
+  });
+  expect(await s.claimObjectMap("m", "v", "refresh", true)).toMatchObject({
+    claimed: true,
+  });
+  expect(
+    await s.claimObjectMap("m", "v", "racing-refresh", true),
+  ).toMatchObject({ claimed: false, map: { status: "pending" } });
+});

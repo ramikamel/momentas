@@ -1,213 +1,298 @@
 "use client";
-import { useRef, useState } from "react";
-import { ImagePlus } from "lucide-react";
-import type { VisualReferenceView } from "@/lib/memory/references";
-
-export type PendingReference = {
-  id: string;
-  name: string;
-  kind: "person" | "place";
-  imageUrl: string;
-  file?: File;
-  uploaded?: boolean;
+import { useEffect, useId, useRef, useState } from "react";
+import { ImagePlus, X } from "lucide-react";
+import type { ReferenceView } from "@/lib/memory/personalization";
+import "./reference-photos.css";
+type Props = {
+  memoryId?: string;
+  ensureMemory?: () => Promise<string>;
+  onChanged?: () => void | Promise<void>;
+  onBusyChange?: (busy: boolean) => void;
 };
-
+export async function compressReference(file: File): Promise<Blob> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
+    throw new Error("Choose a JPEG, PNG, or WebP photo.");
+  if (!file.size || file.size > 25 * 1024 * 1024)
+    throw new Error("Choose a photo smaller than 25 MB.");
+  const bitmap = await createImageBitmap(file);
+  try {
+    if (bitmap.width * bitmap.height > 20_000_000)
+      throw new Error("Choose a photo up to 20 megapixels.");
+    const scale = Math.min(1, 1536 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Your browser could not prepare this photo.");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (b) =>
+          b ? resolve(b) : reject(new Error("Could not prepare this photo.")),
+        "image/webp",
+        0.85,
+      ),
+    );
+    if (blob.size > 2.8 * 1024 * 1024)
+      throw new Error("This photo is too large. Choose a smaller image.");
+    return blob;
+  } finally {
+    bitmap.close();
+  }
+}
 export function ReferencePhotos({
   memoryId,
-  references,
-  onChange,
-  disabled,
-}: {
-  memoryId: string | null;
-  references: PendingReference[];
-  onChange: (next: PendingReference[]) => void;
-  disabled?: boolean;
-}) {
-  const [name, setName] = useState(""),
-    [kind, setKind] = useState<"person" | "place">("person"),
-    [file, setFile] = useState<File | null>(null),
-    [preview, setPreview] = useState(""),
-    [error, setError] = useState("");
-  const picker = useRef<HTMLInputElement>(null);
-  function choose(next: File | null) {
-    if (preview) URL.revokeObjectURL(preview);
-    setFile(next);
-    setPreview(next ? URL.createObjectURL(next) : "");
-  }
-  function clearChoice() {
-    choose(null);
-    if (picker.current) picker.current.value = "";
-  }
-  async function add() {
-    if (!file || !name.trim() || disabled) return;
+  ensureMemory,
+  onChanged,
+  onBusyChange,
+}: Props) {
+  const [resolvedId, setResolvedId] = useState(memoryId);
+  const id = memoryId || resolvedId;
+  const [items, setItems] = useState<ReferenceView[]>([]),
+    [photo, setPhoto] = useState<Blob | null>(null);
+  const [preview, setPreview] = useState(""),
+    [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [status, setStatus] = useState("");
+  const nameId = useId();
+  const nameInput = useRef<HTMLInputElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    onBusyChange?.(busy || !!photo);
+    return () => onBusyChange?.(false);
+  }, [busy, photo, onBusyChange]);
+  const input = useRef<HTMLInputElement>(null);
+  const selection = useRef(0);
+  const mutations = useRef(0);
+  useEffect(() => {
+    if (memoryId) setResolvedId(memoryId);
+  }, [memoryId]);
+  useEffect(() => {
+    if (!id) return;
+    const controller = new AbortController();
+    const revision = mutations.current;
+    fetch(`/api/memories/${id}/references`, { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+        if (mutations.current === revision) setItems(data);
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") setError(e.message);
+      });
+    return () => controller.abort();
+  }, [id]);
+  useEffect(() => {
+    if (!photo) {
+      setPreview("");
+      return;
+    }
+    const url = URL.createObjectURL(photo);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+  useEffect(
+    () => () => {
+      selection.current++;
+    },
+    [],
+  );
+  useEffect(() => {
+    if (preview) nameInput.current?.focus();
+  }, [preview]);
+  function cancel() {
+    selection.current++;
+    setPhoto(null);
+    setLabel("");
     setError("");
-    if (!memoryId) {
-      onChange([
-        ...references,
-        {
-          id: crypto.randomUUID(),
-          name: name.trim(),
-          kind,
-          imageUrl: URL.createObjectURL(file),
-          file,
-        },
-      ]);
-      setName("");
-      clearChoice();
-      return;
-    }
-    const body = new FormData();
-    body.set("name", name.trim());
-    body.set("kind", kind);
-    body.set("image", file);
-    const r = await fetch(`/api/memories/${memoryId}/references`, {
-      method: "POST",
-      body,
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      setError(data.error || "Could not add that picture.");
-      return;
-    }
-    onChange([...references, data as VisualReferenceView]);
-    setName("");
-    clearChoice();
+    if (input.current) input.current.value = "";
+    uploadButton.current?.focus();
   }
-  async function remove(reference: PendingReference) {
-    if (reference.file) {
-      if (reference.imageUrl.startsWith("blob:"))
-        URL.revokeObjectURL(reference.imageUrl);
-      onChange(references.filter((item) => item.id !== reference.id));
-      return;
+  const uploadButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!busy && !photo && status)
+      (uploadButton.current ?? heading.current)?.focus();
+  }, [busy, photo, status]);
+  async function choose(file?: File) {
+    if (!file) return;
+    const sequence = ++selection.current;
+    setError("");
+    setStatus("");
+    setBusy(true);
+    setPhoto(null);
+    try {
+      const blob = await compressReference(file);
+      if (selection.current === sequence) setPhoto(blob);
+    } catch (e) {
+      if (selection.current === sequence)
+        setError(e instanceof Error ? e.message : "Could not prepare photo.");
+    } finally {
+      if (selection.current === sequence) setBusy(false);
     }
-    if (!memoryId) return;
-    const r = await fetch(
-      `/api/memories/${memoryId}/references/${reference.id}`,
-      { method: "DELETE" },
-    );
-    if (!r.ok && r.status !== 204) {
-      const data = await r.json().catch(() => ({}));
-      setError(data.error || "Could not remove that picture.");
-      return;
+  }
+  async function save() {
+    if (!photo || !label.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const target = id || (await ensureMemory?.());
+      if (!target) throw new Error("Save a memory before adding photos.");
+      setResolvedId(target);
+      const body = new FormData();
+      body.set("photo", photo, "reference.webp");
+      body.set("label", label.trim());
+      const response = await fetch(`/api/memories/${target}/references`, {
+        method: "POST",
+        body,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      mutations.current++;
+      setItems((current) => [
+        ...current.filter((item) => item.id !== data.id),
+        data,
+      ]);
+      setPhoto(null);
+      setStatus(`Added ${data.label}. Mention this name in your memory.`);
+      setLabel("");
+      if (input.current) input.current.value = "";
+      await onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save photo.");
+    } finally {
+      setBusy(false);
     }
-    onChange(references.filter((item) => item.id !== reference.id));
+  }
+  async function remove(referenceId: string) {
+    if (busy || !id) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/memories/${id}/references/${referenceId}`,
+        { method: "DELETE" },
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      mutations.current++;
+      setItems((current) => current.filter((item) => item.id !== referenceId));
+      setStatus("Image removed.");
+      await onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove photo.");
+    } finally {
+      setBusy(false);
+    }
   }
   return (
-    <div className={`reference-photos${disabled ? " is-disabled" : ""}`}>
-      <span className="reference-legend">Pictures that should show up</span>
-      <p className="muted small">
-        Add a photo of a person or a place, and the name you use for them in
-        the memory. Mention that name when you tell it — Dad, the kitchen —
-        and the reconstruction uses the photo for them.
-      </p>
-      {references.length > 0 && (
-        <ul className="reference-list">
-          {references.map((reference) => (
-            <li key={reference.id}>
-              <img src={reference.imageUrl} alt="" />
-              <span>
-                <strong>{reference.name}</strong>
-                <small>{reference.kind === "person" ? "Person" : "Place"}</small>
-              </span>
+    <section
+      className="reference-photos"
+      aria-label="Reference photos"
+      aria-busy={busy}
+    >
+      <div className="reference-heading">
+        <div>
+          <h3 ref={heading} tabIndex={-1}>
+            Pictures to remember by
+          </h3>
+          <p>Name a picture, then mention it in your memory.</p>
+        </div>
+        {items.length < 4 && (
+          <button
+            ref={uploadButton}
+            className="reference-upload"
+            type="button"
+            disabled={busy}
+            onClick={() => input.current?.click()}
+          >
+            <ImagePlus size={18} aria-hidden="true" />
+            {busy ? "Please wait…" : photo ? "Change image" : "Upload image"}
+          </button>
+        )}
+      </div>
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        aria-label="Upload a reference image"
+        hidden
+        onChange={(e) => void choose(e.target.files?.[0])}
+      />
+      {photo && (
+        <div className="reference-editor">
+          <div className="reference-preview">
+            {preview && <img src={preview} alt="Selected image" />}
+          </div>
+          <div className="reference-name">
+            <label htmlFor={nameId}>What should we call this?</label>
+            <input
+              ref={nameInput}
+              id={nameId}
+              value={label}
+              maxLength={80}
+              placeholder="Dad, our kitchen, my red bike…"
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void save();
+                }
+              }}
+              disabled={busy}
+            />
+            <div className="reference-editor-actions">
               <button
+                className="reference-save"
                 type="button"
-                className="quiet-link"
-                onClick={() => void remove(reference)}
+                onClick={() => void save()}
+                disabled={busy || !label.trim()}
               >
-                Remove
+                {busy ? "Adding…" : "Add image"}
+              </button>
+              <button
+                className="reference-cancel"
+                type="button"
+                disabled={busy}
+                onClick={cancel}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {items.length > 0 && (
+        <ul className="reference-list" aria-label="Added images">
+          {items.map((item) => (
+            <li key={item.id}>
+              <img src={item.imageUrl} alt={item.label} />
+              <span className="reference-label">{item.label}</span>
+              <button
+                className="reference-remove"
+                type="button"
+                disabled={busy}
+                onClick={() => void remove(item.id)}
+                aria-label={`Remove ${item.label}`}
+              >
+                <X size={16} aria-hidden="true" />
               </button>
             </li>
           ))}
         </ul>
       )}
-      {references.length < 4 && (
-        <div className="reference-composer">
-          <label className="reference-picker">
-            <input
-              ref={picker}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(e) => choose(e.target.files?.[0] ?? null)}
-            />
-            {preview ? (
-              <img src={preview} alt="" />
-            ) : (
-              <span className="reference-placeholder" aria-hidden="true">
-                <ImagePlus size={18} />
-              </span>
-            )}
-            <span>
-              <strong>{file ? file.name : "Choose a photo"}</strong>
-              <small>JPEG, PNG, or WebP</small>
-            </span>
-          </label>
-          <label className="field">
-            <span>Name in the memory</span>
-            <input
-              maxLength={40}
-              placeholder="Dad"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <div className="reference-kinds" role="group" aria-label="This picture is">
-            <button
-              type="button"
-              className={kind === "person" ? "is-selected" : ""}
-              aria-pressed={kind === "person"}
-              onClick={() => setKind("person")}
-            >
-              A person
-            </button>
-            <button
-              type="button"
-              className={kind === "place" ? "is-selected" : ""}
-              aria-pressed={kind === "place"}
-              onClick={() => setKind("place")}
-            >
-              A place
-            </button>
-          </div>
-          <button
-            type="button"
-            className="button subtle wide"
-            disabled={!file || !name.trim()}
-            onClick={() => void add()}
-          >
-            Add this picture
-          </button>
-        </div>
-      )}
+      <div className="reference-footer">
+        <span>These pictures stay private.</span>
+        <span>{items.length} of 4 added</span>
+      </div>
+      <p className="reference-status" role="status">
+        {status}
+      </p>
       {error && (
-        <p className="error" role="alert">
+        <p className="reference-error" role="alert">
           {error}
         </p>
       )}
-    </div>
+    </section>
   );
-}
-
-export async function uploadPendingReferences(
-  memoryId: string,
-  references: PendingReference[],
-) {
-  const next = [...references];
-  for (let i = 0; i < next.length; i++) {
-    const reference = next[i];
-    if (!reference.file || reference.uploaded) continue;
-    const body = new FormData();
-    body.set("name", reference.name);
-    body.set("kind", reference.kind);
-    body.set("image", reference.file);
-    const r = await fetch(`/api/memories/${memoryId}/references`, {
-      method: "POST",
-      body,
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || "Could not add that picture.");
-    if (reference.imageUrl.startsWith("blob:"))
-      URL.revokeObjectURL(reference.imageUrl);
-    next[i] = { ...(data as VisualReferenceView), uploaded: true };
-  }
-  return next;
 }

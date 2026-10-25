@@ -3,10 +3,13 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { ImageVersionView } from "@/lib/memory/types";
 import type { PinDraft, PublicPin } from "@/lib/memory/connections";
 import { DetailOutline } from "./detail-outline";
-import { outlineAnchor, outlineArea } from "@/lib/memory/outlines";
 import "./connections.css";
-type Position = { x: number; y: number };
-type Region = { id: string; label: string; path: string };
+import "./object-details.css";
+import type { DetectedObject, ObjectMap } from "@/lib/memory/personalization";
+type Position = {
+  x: number;
+  y: number;
+};
 export function DetailPinEditor({
   memoryId,
   version,
@@ -27,10 +30,101 @@ export function DetailPinEditor({
     [outline, setOutline] = useState<PublicPin["outline"] | null>(null),
     [finding, setFinding] = useState(false),
     [outlineNotice, setOutlineNotice] = useState(""),
-    [regions, setRegions] = useState<Region[]>([]),
-    [regionNote, setRegionNote] = useState(""),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
+  const [objectMap, setObjectMap] = useState<ObjectMap | null>(null),
+    [objects, setObjects] = useState<DetectedObject[]>([]),
+    [concept, setConcept] = useState(""),
+    [preparing, setPreparing] = useState(true),
+    [scan, setScan] = useState(0),
+    [manual, setManual] = useState(false);
+  const objectUrl = `/api/memories/${memoryId}/versions/${version.id}/objects`;
+  useEffect(() => {
+    let active = true,
+      timer: ReturnType<typeof setTimeout>;
+    async function load(prepare = false) {
+      try {
+        const response = await fetch(
+          objectUrl,
+          prepare
+            ? {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ retry: scan > 0 }),
+              }
+            : undefined,
+        );
+        const data = await response.json();
+        if (!active) return;
+        if (!response.ok)
+          throw new Error(data.error || "Object preparation unavailable.");
+        if (!data.map && !prepare) {
+          void load(true);
+          return;
+        }
+        setObjectMap(data.map);
+        setObjects(data.map?.objects || []);
+        setPreparing(data.map?.status === "pending");
+        if (data.map?.status === "pending")
+          timer = setTimeout(() => void load(), 2000);
+      } catch {
+        if (active) {
+          setPreparing(false);
+          setOutlineNotice(
+            "Object preparation unavailable. You can place a simple pin.",
+          );
+        }
+      }
+    }
+    setPreparing(true);
+    void load(scan > 0);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [objectUrl, scan]);
+  function chooseObject(object: DetectedObject) {
+    stopOutline();
+    setAdding(true);
+    setManual(false);
+    setPosition({ x: object.x, y: object.y });
+    setOutline(object.outline);
+    setOutlineNotice(
+      `Selected ${object.label}. Choose another object to change the target.`,
+    );
+    requestAnimationFrame(() => textarea.current?.focus());
+  }
+  async function findObject() {
+    if (!concept.trim() || finding) return;
+    setFinding(true);
+    try {
+      const response = await fetch(objectUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ concept }),
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Could not find this object.");
+      setObjects((current) => [
+        ...current.filter(
+          (o) => !data.objects.some((n: DetectedObject) => n.id === o.id),
+        ),
+        ...data.objects,
+      ]);
+      if (data.objects.length) chooseObject(data.objects[0]);
+      else
+        setOutlineNotice(
+          "No matching object found. Try another name or place a pin.",
+        );
+    } catch (error) {
+      setOutlineNotice(
+        error instanceof Error ? error.message : "Could not find this object.",
+      );
+    } finally {
+      setFinding(false);
+    }
+  }
   const textarea = useRef<HTMLTextAreaElement>(null),
     addButton = useRef<HTMLButtonElement>(null),
     request = useRef<AbortController | null>(null),
@@ -43,49 +137,6 @@ export function DetailPinEditor({
     },
     [],
   );
-  useEffect(() => {
-    let ignore = false;
-    setRegionNote("Marking the things you can click…");
-    fetch(`/api/memories/${memoryId}/versions/${version.id}/regions`, {
-      method: "POST",
-    })
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || "Outlines unavailable.");
-        return (data.regions || []) as Region[];
-      })
-      .then((items) => {
-        if (ignore) return;
-        setRegions(items);
-        setRegionNote(
-          items.length
-            ? "Click an outline. Click a smaller one, such as a helmet, to choose that part. Click another outline to change it."
-            : "",
-        );
-      })
-      .catch(() => {
-        if (!ignore) setRegionNote("");
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [memoryId, version.id]);
-  function choose(region: Region) {
-    stopOutline();
-    const point = outlineAnchor(region.path);
-    setAdding(true);
-    setOutline({ path: region.path });
-    setPosition(point);
-    setCursor(point);
-    setFinding(false);
-    setOutlineNotice(
-      `Selected the ${region.label}. Click another outline to change it.`,
-    );
-    requestAnimationFrame(() => textarea.current?.focus());
-  }
-  const painted = [...regions].sort(
-    (a, b) => outlineArea(b.path) - outlineArea(a.path),
-  );
   function stopOutline() {
     generation.current++;
     request.current?.abort();
@@ -94,6 +145,7 @@ export function DetailPinEditor({
   function cancel() {
     stopOutline();
     setAdding(false);
+    setManual(false);
     setPosition(null);
     setText("");
     setEditing(null);
@@ -103,44 +155,12 @@ export function DetailPinEditor({
   }
   async function place(point: Position) {
     stopOutline();
-    const current = generation.current,
-      controller = new AbortController();
-    request.current = controller;
     setPosition(point);
     setCursor(point);
     setOutline(null);
-    setFinding(true);
-    setOutlineNotice("");
+    setFinding(false);
+    setOutlineNotice("Your detail will use a simple pin.");
     requestAnimationFrame(() => textarea.current?.focus());
-    try {
-      const r = await fetch(
-        `/api/memories/${memoryId}/versions/${version.id}/outline`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(point),
-          signal: controller.signal,
-        },
-      );
-      const data = await r.json();
-      if (current !== generation.current) return;
-      if (!r.ok) throw new Error(data.error || "Object outline unavailable.");
-      setOutline(data.outline);
-      setOutlineNotice(
-        data.outline
-          ? "Object outlined. If it isn’t the right object, use a simple pin or choose another spot."
-          : "No object found here. Your detail will use a simple pin.",
-      );
-    } catch (e) {
-      if (current === generation.current)
-        setOutlineNotice(
-          e instanceof Error && e.name !== "AbortError"
-            ? "Couldn’t outline this object. You can still save your note with a pin."
-            : "",
-        );
-    } finally {
-      if (current === generation.current) setFinding(false);
-    }
   }
   async function persist(next: PinDraft[]): Promise<boolean> {
     setBusy(true);
@@ -194,11 +214,9 @@ export function DetailPinEditor({
         <div>
           <span className="conn-eyebrow">Your memory, in the details</span>
           <p id={helpId} className="conn-muted">
-            {regions.length
-              ? "The things in the picture are already outlined. Click one to leave a note, or click a smaller outline to choose just that part."
-              : adding
-                ? "Click a spot in the image, then tell its story."
-                : "Some things only you remember. Add a note to a person, object, or place."}
+            {adding
+              ? "Click a spot in the image, then tell its story."
+              : "Some things only you remember. Add a note to a person, object, or place."}
           </p>
         </div>
         {!adding && (
@@ -209,11 +227,12 @@ export function DetailPinEditor({
             disabled={pins.length >= 5 || busy}
             onClick={() => {
               setAdding(true);
+              setManual(true);
               setNotice("");
               setCursor({ x: 0.5, y: 0.5 });
             }}
           >
-            ＋ Add a detail
+            ＋ Place a simple pin
           </button>
         )}
         {adding && (
@@ -235,14 +254,33 @@ export function DetailPinEditor({
           alt="AI reconstruction of your memory"
           draggable={false}
         />
-        <DetailOutline
-          outline={
-            regions.some((region) => region.path === outline?.path)
-              ? null
-              : outline
-          }
-        />
-        {adding && (
+        <DetailOutline outline={outline} />
+        {!manual && (
+          <svg
+            fillRule="evenodd"
+            className="object-map-overlay"
+            viewBox="0 0 1000 1000"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {[...objects]
+              .sort((a, b) => b.area - a.area)
+              .map((object) => (
+                <path
+                  key={object.id}
+                  d={object.outline.path}
+                  className={
+                    outline?.path === object.outline.path ? "selected" : ""
+                  }
+                  onClick={() => {
+                    if (!busy && (adding || pins.length < 5))
+                      chooseObject(object);
+                  }}
+                />
+              ))}
+          </svg>
+        )}
+        {adding && manual && (
           <button
             type="button"
             className="conn-place-hit"
@@ -261,7 +299,9 @@ export function DetailPinEditor({
               });
             }}
             onKeyDown={(e) => {
-              const delta: { [key: string]: Position } = {
+              const delta: {
+                [key: string]: Position;
+              } = {
                 ArrowLeft: { x: -0.02, y: 0 },
                 ArrowRight: { x: 0.02, y: 0 },
                 ArrowUp: { x: 0, y: -0.02 },
@@ -284,34 +324,6 @@ export function DetailPinEditor({
               }
             }}
           />
-        )}
-        {painted.length > 0 && (
-          <svg
-            className="conn-region-layer"
-            viewBox="0 0 1000 1000"
-            preserveAspectRatio="none"
-          >
-            {painted.map((region) => (
-              <path
-                key={region.id}
-                d={region.path}
-                role="button"
-                tabIndex={busy ? -1 : 0}
-                aria-label={`Select the ${region.label}`}
-                className={outline?.path === region.path ? "is-selected" : ""}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!busy) choose(region);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    if (!busy) choose(region);
-                  }
-                }}
-              />
-            ))}
-          </svg>
         )}
         {pins
           .filter((p) => p.id !== editing)
@@ -354,11 +366,73 @@ export function DetailPinEditor({
           <span className="conn-image-credit">AI RECONSTRUCTION</span>
         )}
       </div>
-      {regionNote && (
-        <p className="conn-small" role="status">
-          {regionNote}
+      <div className="object-map-controls">
+        <p role="status" className="conn-small">
+          {preparing
+            ? "Preparing selectable objects…"
+            : objectMap?.status === "failed"
+              ? "Object preparation failed. Place a pin or retry."
+              : objects.length
+                ? "Choose an outlined object, then tell its story."
+                : "No objects found. Search for an object or place a pin."}
         </p>
-      )}
+        <button
+          type="button"
+          className="conn-link"
+          disabled={preparing || busy || finding}
+          onClick={() => setScan((current) => current + 1)}
+        >
+          {objectMap?.status === "failed"
+            ? "Retry preparation"
+            : "Refresh outlines"}
+        </button>
+        <div className="object-map-buttons">
+          {objects.map((object, i) => (
+            <button
+              type="button"
+              className="conn-button secondary"
+              key={object.id}
+              disabled={busy || (!adding && pins.length >= 5)}
+              aria-label={`Select ${object.label}${objects.filter((o) => o.label === object.label).length > 1 ? ` ${i + 1}` : ""}`}
+              aria-pressed={outline?.path === object.outline.path}
+              onClick={() => chooseObject(object)}
+            >
+              {object.label}
+            </button>
+          ))}
+        </div>
+        <div className="object-map-search">
+          <label>
+            Find an object
+            <input
+              value={concept}
+              onChange={(e) => setConcept(e.target.value)}
+              placeholder="e.g. helmet"
+              maxLength={60}
+              disabled={busy || finding}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void findObject();
+                }
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="conn-button secondary"
+            disabled={
+              busy ||
+              finding ||
+              !concept.trim() ||
+              (!adding && pins.length >= 5)
+            }
+            onClick={() => void findObject()}
+          >
+            {finding ? "Finding…" : "Find object"}
+          </button>
+        </div>
+      </div>
       {adding && !position && (
         <p className="conn-placement-hint">
           Tap or click the image to place your detail. You can also focus the

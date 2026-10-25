@@ -27,7 +27,6 @@ Show a single moment in one continuous scene. Depict each person only once. If t
 export function buildImagePrompt(
   scene: ApprovedScene,
   instruction?: string,
-  references?: { name: string; kind: "person" | "place" }[],
 ): string {
   const p = scene.plan;
   const lines = [
@@ -44,15 +43,6 @@ export function buildImagePrompt(
     instruction &&
       `Requested revision: ${instruction}
 Preserve the reference scene, composition, people, colors, and important details except those explicitly changed. If the reference image is illustrated or stylized, reconstruct the same scene with photographic realism rather than preserving its art style.`,
-    references?.length &&
-      `Named reference photographs are attached in this order${instruction ? ", after the scene image being revised" : ""}. These photographs supply the likeness or place that would otherwise stay unspecified.
-${references
-  .map(
-    (reference, index) =>
-      `${index + 1}. ${reference.kind === "person" ? "Person" : "Place"} named “${reference.name}”. When the memory mentions “${reference.name}”, match this photograph for that ${reference.kind}.`,
-  )
-  .join("\n")}
-Use the references to improve likeness and place accuracy. Do not collage the source photos into the frame, and do not add a person or place that was not named.`,
   ];
   return lines.filter(Boolean).join("\n");
 }

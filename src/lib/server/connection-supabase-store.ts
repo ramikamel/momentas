@@ -1,3 +1,8 @@
+import type {
+  MemoryReference,
+  ObjectMap,
+  PersonalizationStore,
+} from "../memory/personalization";
 import { normalizePins } from "../memory/pins";
 import type { ApprovedScene } from "../memory/types";
 import type {
@@ -10,7 +15,7 @@ import type {
 export function createConnectionSupabaseStore(
   url: string,
   key: string,
-): ConnectionStore {
+): ConnectionStore & PersonalizationStore {
   const base = url.replace(/\/$/, "").replace(/\/rest\/v1$/, "");
   async function req(path: string, init: RequestInit = {}) {
     const r = await fetch(base + path, {
@@ -62,6 +67,78 @@ export function createConnectionSupabaseStore(
     return p.split("/").map(encodeURIComponent).join("/");
   };
   return {
+    references: async (memoryId) => {
+      const rows = await req(
+        `/rest/v1/memory_references?memory_id=eq.${encodeURIComponent(memoryId)}&order=created_at.asc`,
+      );
+      return rows.map((r: { data: MemoryReference }) => r.data);
+    },
+    saveReference: async (reference) => {
+      await req("/rest/v1/rpc/save_memory_reference", {
+        method: "POST",
+        body: JSON.stringify({ p_reference: reference }),
+      });
+    },
+    deleteReference: async (memoryId, referenceId) => {
+      await req(
+        `/rest/v1/memory_references?memory_id=eq.${encodeURIComponent(memoryId)}&id=eq.${encodeURIComponent(referenceId)}`,
+        { method: "DELETE" },
+      );
+    },
+    getObjectMap: async (memoryId, versionId) => {
+      const rows = await req(
+        `/rest/v1/memory_object_maps?memory_id=eq.${encodeURIComponent(memoryId)}&version_id=eq.${encodeURIComponent(versionId)}&limit=1`,
+      );
+      if (!rows[0]) return null;
+      const r = rows[0];
+      return {
+        ...r.data,
+        status:
+          r.status === "pending" && Date.parse(r.expires_at) <= Date.now()
+            ? "failed"
+            : r.status,
+      } as ObjectMap;
+    },
+    claimObjectMap: async (memoryId, versionId, requestId, retry) => {
+      if (retry) {
+        // A user-requested rescan can replace a completed cache, never a pending lease.
+        await req(
+          `/rest/v1/memory_object_maps?memory_id=eq.${encodeURIComponent(memoryId)}&version_id=eq.${encodeURIComponent(versionId)}&status=eq.complete`,
+          { method: "PATCH", body: JSON.stringify({ status: "failed" }) },
+        );
+      }
+      return req("/rest/v1/rpc/claim_memory_object_map", {
+        method: "POST",
+        body: JSON.stringify({
+          p_memory_id: memoryId,
+          p_version_id: versionId,
+          p_request_id: requestId,
+          p_retry: retry,
+        }),
+      });
+    },
+    saveObjectMap: async (memoryId, versionId, requestId, objects, status) => {
+      await req("/rest/v1/rpc/save_memory_object_map", {
+        method: "POST",
+        body: JSON.stringify({
+          p_memory_id: memoryId,
+          p_version_id: versionId,
+          p_request_id: requestId,
+          p_objects: objects,
+          p_status: status,
+        }),
+      });
+    },
+    reserveOutlineBatch: async (memoryId, versionId, requestIds) => {
+      await req("/rest/v1/rpc/reserve_detail_outline_batch", {
+        method: "POST",
+        body: JSON.stringify({
+          p_memory_id: memoryId,
+          p_version_id: versionId,
+          p_request_ids: requestIds,
+        }),
+      });
+    },
     reserveDetailOutline: async (memoryId, versionId, requestId) => {
       await req("/rest/v1/rpc/reserve_detail_outline", {
         method: "POST",

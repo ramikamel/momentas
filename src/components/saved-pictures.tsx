@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { SavedMemory } from "@/lib/memory/types";
-import { Header } from "./memory-app";
+import { Header } from "./site-header";
 export function SavedPictures() {
   const [data, setData] = useState<{
       memories: SavedMemory[];
@@ -37,7 +37,7 @@ export function SavedPictures() {
           Your editing access is saved in this browser on this site. If a memory
           is missing, use the browser and site address where you created it.
         </p>
-        <Link className="button primary" href="/#begin">
+        <Link className="button primary" href="/#choose">
           Create a memory →
         </Link>
         {error && (
@@ -92,11 +92,13 @@ export function SavedPictures() {
                   >
                     <img
                       src={v.imageUrl}
-                      alt={`AI reconstruction of ${m.title}, saved image ${i + 1}`}
+                      alt={`${v.origin === "source" ? "Original photograph" : "AI reconstruction"} of ${m.title}, saved image ${i + 1}`}
                       loading="lazy"
                     />
                     <span>
-                      Image {i + 1}
+                      {v.origin === "source"
+                        ? "Original photograph"
+                        : `Image ${i + 1}`}
                       <span>Open picture ↗</span>
                     </span>
                   </Link>

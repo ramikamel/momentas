@@ -1,0 +1,220 @@
+.frame-page {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 30px 46px 70px;
+}
+.frame-back {
+  color: var(--muted);
+  font-size: 12px;
+  display: inline-block;
+  margin-bottom: 30px;
+}
+.frame-intro {
+  margin-bottom: 34px;
+}
+.frame-intro h1 {
+  font-size: clamp(38px, 5vw, 62px);
+  margin: 15px 0;
+}
+.frame-intro > p {
+  color: var(--muted);
+  font-size: 17px;
+}
+.outside-frame {
+  border-radius: 18px;
+  overflow: hidden;
+}
+.outside-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 30px;
+  align-items: start;
+}
+.outside-compose figure {
+  margin: 0;
+  min-width: 0;
+}
+.outside-compose figure img {
+  width: 100%;
+  display: block;
+  border: 9px solid var(--surface);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px #25392113;
+}
+.outside-compose figcaption {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  margin: 15px 4px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.outside-compose figcaption span {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+.outside-prompt {
+  padding: 30px;
+  background: var(--surface-blue);
+  border-radius: 14px;
+  min-width: 0;
+}
+.outside-prompt h2 {
+  font-size: clamp(29px, 3.2vw, 40px);
+  margin: 14px 0 18px;
+}
+.outside-prompt > p {
+  color: #526875;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.outside-prompt label {
+  display: block;
+  font-size: 12px;
+  color: #365468;
+  margin: 24px 0 10px;
+}
+.outside-prompt textarea {
+  width: 100%;
+  border: 1px solid #bdcdd3;
+  border-radius: 9px;
+  background: var(--field-bg);
+  padding: 14px;
+  resize: vertical;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.65;
+  min-height: 150px;
+}
+.outside-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 20px;
+}
+.outside-prompt .outside-actions > .primary {
+  width: 100%;
+  justify-content: center;
+}
+.outside-prompt > .outside-caption {
+  font-size: 11px;
+  margin-top: 16px;
+  color: var(--muted);
+}
+.outside-prompt [role="alert"] {
+  color: #a14a36;
+  margin-top: 15px;
+}
+.outside-generated {
+  animation: memory-reveal 0.7s ease-out;
+}
+.has-reveal .outside-compose {
+  grid-template-columns: 1fr 1fr;
+}
+.outside-after {
+  padding: 28px 0 0;
+}
+.outside-account {
+  border-left: 2px solid var(--field-border);
+  padding: 5px 22px;
+}
+.outside-account blockquote {
+  font: 21px/1.6 var(--font-story);
+  margin: 12px 0 0;
+  max-width: 800px;
+}
+.frame-extras {
+  border-top: 1px solid var(--line);
+  margin-top: 48px;
+  padding-top: 26px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.frame-extras h2 {
+  font-size: 23px;
+}
+.frame-extras p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 7px;
+}
+.frame-extras > .is-embedded {
+  width: 100%;
+  padding: 28px 0 0;
+  background: transparent;
+}
+.is-embedded .photo-heading > a,
+.is-embedded .photo-heading > .eyebrow {
+  display: none;
+}
+.is-embedded .photo-heading {
+  padding-top: 0;
+}
+.is-embedded .photo-heading h2 {
+  font-size: 30px;
+}
+.is-embedded .photo-story p {
+  color: inherit;
+}
+@keyframes memory-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 750px) {
+  .frame-page {
+    padding: 25px 22px 45px;
+  }
+  .frame-back {
+    margin-bottom: 26px;
+  }
+  .frame-intro {
+    margin-bottom: 25px;
+  }
+  .frame-intro > p {
+    font-size: 15px;
+  }
+  .outside-compose,
+  .has-reveal .outside-compose {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .outside-prompt {
+    padding: 25px;
+  }
+  .outside-compose figcaption {
+    font-size: 9px;
+  }
+  .frame-extras {
+    margin-top: 35px;
+    align-items: flex-start;
+  }
+  .outside-after .outside-actions > .primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .outside-account blockquote {
+    font-size: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .outside-generated {
+    animation: none;
+  }
+}
+
+.frame-intro .eyebrow {
+  letter-spacing: 0;
+  font-size: 12px;
+}
