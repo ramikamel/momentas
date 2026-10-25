@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.next-e2e/
+.vercel/
+.env*
+!.env.example
+.data/
+tmp/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.superpowers/
+.DS_Store
+.vercel
+
+# Recordings and screenshots are local deliverables, not source.
+output/

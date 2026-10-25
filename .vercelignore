@@ -1,0 +1,13 @@
+.env
+.env.*
+.data
+tmp
+.next-e2e
+test-results
+playwright-report
+tests
+e2e
+scripts
+docs
+output
+.superpowers
