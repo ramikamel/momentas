@@ -75,10 +75,7 @@ export function PerspectiveControls({
           {p.role === "contributor" && !p.attached && (
             <>
               <p className="conn-control-caption">
-                Your current published image, caption, selected quotes and
-                optional recorded voice will join the comparison. This
-                comparison keeps this approved version when you later edit your
-                memory.
+                Share this published version. Later edits stay private.
               </p>
               <button
                 type="button"
@@ -91,7 +88,7 @@ export function PerspectiveControls({
                   })
                 }
               >
-                Add this version to our comparison
+                Add my perspective
               </button>
             </>
           )}
@@ -103,38 +100,14 @@ export function PerspectiveControls({
                 rel="noreferrer"
                 className="conn-button"
               >
-                Open our comparison →
+                View both perspectives
               </a>
-              {p.synthesisStatus !== "complete" && (
-                <button
-                  type="button"
-                  className="conn-button secondary"
-                  disabled={busy || p.synthesisStatus === "pending"}
-                  onClick={() =>
-                    act("/synthesis", {
-                      linkId: p.id,
-                      requestId: crypto.randomUUID(),
-                    })
-                  }
-                >
-                  {busy || p.synthesisStatus === "pending"
-                    ? "Finding the connections…"
-                    : p.synthesisStatus === "failed"
-                      ? "Retry comparison insights"
-                      : "Create comparison insights"}
-                </button>
-              )}
             </div>
-          ) : (
-            <p className="conn-small">
-              The reveal opens when the other perspective is reviewed and
-              shared.
+          ) : p.role === "original" ? (
+            <p className="conn-small perspective-waiting">
+              Waiting for their perspective.
             </p>
-          )}
-          <p className="conn-small">
-            Comparisons keep the versions both people chose to share. Later
-            drafts stay separate.
-          </p>
+          ) : null}
         </>
       )}
       {error && (

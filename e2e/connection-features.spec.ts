@@ -151,35 +151,42 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
   await recipient
     .getByRole("button", { name: "Publish this memory", exact: true })
     .click();
+  await expect(
+    recipient.getByText(
+      "Share this published version. Later edits stay private.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    recipient.getByText(
+      "Comparisons keep the versions both people chose to share.",
+      { exact: false },
+    ),
+  ).toHaveCount(0);
   await recipient
     .getByRole("button", {
-      name: "Add this version to our comparison",
+      name: "Add my perspective",
       exact: true,
     })
     .click();
-  await recipient
-    .getByRole("button", { name: "Create comparison insights", exact: true })
-    .click();
-  await expect
-    .poll(async () => {
-      const m = await (
-        await recipient.request.get(`/api/memories/${childId}`)
-      ).json();
-      return m.perspective.synthesisStatus;
-    })
-    .toBe("complete");
+  await expect(
+    recipient.getByRole("link", {
+      name: "View both perspectives",
+      exact: true,
+    }),
+  ).toHaveAttribute("href", compare);
   await recipient.goto(compare);
-  await recipient
-    .getByRole("button", { name: "Reveal our perspectives", exact: false })
-    .click();
   await expect(
     recipient.getByRole("heading", {
-      name: "What your accounts bring together.",
+      name: "One memory. Two perspectives.",
+      exact: true,
     }),
   ).toBeVisible();
-  await expect(
-    recipient.getByRole("tab", { name: "Alex remembers" }),
-  ).toBeVisible();
+  await expect(recipient.getByRole("main").getByRole("img")).toHaveCount(2);
+  await expect(recipient.getByRole("tablist")).toHaveCount(0);
+  await expect(recipient.getByLabel("Your question or reflection")).toHaveCount(
+    0,
+  );
   await recipient.screenshot({
     path: "output/style-consistency/comparison-desktop.png",
     fullPage: true,
@@ -197,6 +204,9 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
     ),
   ).toBe(true);
   await recipient.setViewportSize({ width: 1440, height: 1000 });
+  await expect(recipient.locator("audio")).toHaveCount(0);
+  // Conversations and voice remain on the normal recipient view.
+  await recipient.goto(state.shareUrl);
   await expect(recipient.locator("audio")).toHaveCount(1);
   await recipient.getByRole("button", { name: /Explore detail 1/ }).click();
   await recipient
@@ -211,7 +221,7 @@ test("recorded voice, approved detail pins, two independent perspectives and a h
     .click();
   await expect(
     recipient
-      .locator(".conn-message")
+      .locator("article.message")
       .getByText("Did the parking lot feel that big?", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Refresh", exact: true }).click();

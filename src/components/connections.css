@@ -560,3 +560,11 @@
     font-size: 16px;
   }
 }
+
+.conn-perspective-controls .conn-control-caption {
+  margin: 0 0 14px;
+  max-width: 42ch;
+}
+.conn-perspective-controls .perspective-waiting {
+  margin: 14px 0 0;
+}
