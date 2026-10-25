@@ -26,9 +26,9 @@ import type {
   ScenePlan,
   SourcedDetail,
 } from "@/lib/memory/types";
+import "./entry-choices.css";
 import { PhotoStart } from "./photo-start";
-import { PhotoMemoryWorkspace } from "./photo-memory-workspace";
-import { OutsideFrameReveal } from "./outside-frame-reveal";
+import { PhotoFrameWorkspace } from "./photo-frame-workspace";
 import { ReferencePhotos } from "./reference-photos";
 import { VoiceRecorder } from "./voice-recorder";
 import { MemoryVoicePlayer } from "./memory-voice-player";
@@ -82,7 +82,7 @@ export function Header() {
       <Link className="quiet-link saved-link" href="/library">
         Saved pictures
       </Link>
-      <Link className="quiet-link create-link" href="/#begin">
+      <Link className="quiet-link create-link" href="/#choose">
         Create a memory <ArrowUpRight size={15} />
       </Link>
     </header>
@@ -184,19 +184,26 @@ function StoryFields({
     </>
   );
 }
-function SampleArt() {
-  return (
-    <div className="sample-art sample-art-output">
-      <img
-        src="/sample-memory.webp"
-        alt="Fictional AI memory reconstruction: a red bicycle in the foreground and a father cheering across an enormous parking lot, seen from the rider’s viewpoint."
-      />
-      <span className="sample-label">Fictional sample · Muse Image</span>
-    </div>
-  );
-}
 export function Landing() {
   const router = useRouter();
+  const [storyOpen, setStoryOpen] = useState(false);
+  const photoCreation = useRef<Promise<string> | null>(null);
+  async function ensurePhotoMemory() {
+    if (!photoCreation.current)
+      photoCreation.current = api<{ id: string }>("/api/memories", empty)
+        .then((v) => v.id)
+        .catch((e) => {
+          photoCreation.current = null;
+          throw e;
+        });
+    return photoCreation.current;
+  }
+  function openStory() {
+    setStoryOpen(true);
+    requestAnimationFrame(() =>
+      document.getElementById("begin")?.scrollIntoView({ behavior: "smooth" }),
+    );
+  }
   const [draft, setDraft] = useState<DraftInput>(empty),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -256,6 +263,7 @@ export function Landing() {
     null,
   );
   function sample() {
+    openStory();
     setDraft({
       title: "The day you let go",
       authorName: "Alex",
@@ -306,138 +314,128 @@ export function Landing() {
     <>
       <Header />
       <main>
-        <PhotoStart
-          ensureMemory={ensureDraft}
-          onReady={(memoryId, version) =>
-            router.push(`/memory/${memoryId}?image=${version.id}`)
-          }
-        />
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow">
-              <span /> FOR THE MOMENTS THAT STAY
-            </div>
+        <section className="entry-home" id="choose">
+          <header className="entry-heading">
+            <div className="eyebrow">FOR THE MOMENTS THAT STAY</div>
             <h1>
-              Some memories
-              <br />
-              deserve to be <em>seen.</em>
+              Every memory has <em>more to it.</em>
             </h1>
             <p>
-              You remember more than what happened.
-              <br className="desktop-break" /> You remember how it felt. Turn
-              your memory into a lifelike scene, then share it with someone who
-              matters.
+              A photograph can open a story. A story can become a picture.
+              <br className="desktop-break" /> Choose where yours begins.
             </p>
-            <Link className="button primary" href="#begin">
-              Start a memory <ArrowRight size={18} />
-            </Link>
-            <button className="sample-button" onClick={sample}>
-              Try a sample memory <ArrowUpRight size={15} />
-            </button>
-            <div className="hero-footnote">
-              <Heart size={14} /> Your perspective. Your words. A new
-              conversation.
-            </div>
+          </header>
+          <div className="entry-choices">
+            <PhotoStart
+              ensureMemory={ensurePhotoMemory}
+              onReady={(memoryId, version) =>
+                router.push(`/memory/${memoryId}?image=${version.id}`)
+              }
+            />
+            <section className="entry-story" aria-label="Start from a memory">
+              <div className="entry-story-art" aria-hidden="true">
+                <Feather size={34} />
+                <p>
+                  “I remember it
+                  <br />
+                  <em>like it was yesterday.”</em>
+                </p>
+                <span>THE THINGS A CAMERA COULDN’T KEEP</span>
+              </div>
+              <div className="entry-card-copy">
+                <span className="eyebrow">START WITH YOUR WORDS</span>
+                <h2>Bring a memory to life.</h2>
+                <p>
+                  No photograph? Tell the moment as you remember it, and turn
+                  your words into a lifelike scene.
+                </p>
+                <button className="button primary" onClick={openStory}>
+                  Start with a memory <ArrowRight size={17} />
+                </button>
+                <button className="sample-button" onClick={sample}>
+                  Try a sample memory <ArrowUpRight size={15} />
+                </button>
+              </div>
+            </section>
           </div>
-          <div className="hero-art">
-            <SampleArt />
-            <div className="art-caption">
-              <span>
-                “I didn’t know you’d let go.
-                <br />I only knew I was flying.”
-              </span>
-              <span>01 / A MEMORY OF LEARNING</span>
-            </div>
-          </div>
+          <p className="entry-footnote">
+            <Heart size={14} /> Your perspective. Your words. A little closer to
+            someone.
+          </p>
         </section>
-        <section className="how">
-          <div>
-            <span className="section-number">01</span>
-            <h3>Remember it.</h3>
-            <p>Write it down, or tell it in your own voice.</p>
-          </div>
-          <div>
-            <span className="section-number">02</span>
-            <h3>Make it yours.</h3>
-            <p>Recreate the moment. Leave details someone can discover.</p>
-          </div>
-          <div>
-            <span className="section-number">03</span>
-            <h3>Let them in.</h3>
-            <p>
-              Invite their side of the story. Find what you remember together.
-            </p>
-          </div>
-        </section>
-        <section className="begin-section" id="begin">
-          <div className="begin-intro">
-            <div className="eyebrow">A PLACE TO BEGIN</div>
-            <h2>
-              What takes you
-              <br /> <em>back?</em>
-            </h2>
-            <p>
-              It doesn’t have to be a big moment.
-              <br />
-              Sometimes the small ones hold everything.
-            </p>
-            <span className="hand-note">
-              Let me show you
-              <br />
-              how I remember it.
-            </span>
-          </div>
-          <form className="paper form-card" onSubmit={create}>
-            <fieldset disabled={busy} className="capture-fields">
-              <VoiceRecorder
-                memoryId={createdId || undefined}
-                ensureMemory={ensureDraft}
-                onUse={acceptVoice}
-                onSelect={(narrationId) =>
-                  setDraft((d) => ({ ...d, narrationId }))
-                }
-                onBusyChange={setCaptureBusy}
-              />
-              <StoryFields draft={draft} setDraft={setDraft} />
-              <ReferencePhotos
-                memoryId={createdId || undefined}
-                ensureMemory={ensureDraft}
-                onBusyChange={setReferenceBusy}
-              />
-            </fieldset>
-            <ErrorNotice error={error} />
-            <button
-              disabled={busy || captureBusy || referenceBusy}
-              className="button primary wide"
-              type="submit"
-            >
-              {busy ? "Working on your memory…" : "Submit & generate image"}
-              <ArrowRight size={18} />
-            </button>
-            <button
-              type="button"
-              className="button subtle wide"
-              disabled={busy || captureBusy || referenceBusy}
-              onClick={(e) => {
-                if (e.currentTarget.form?.reportValidity())
-                  void createMode("details");
-              }}
-            >
-              Add details
-            </button>
-            {busy && <Busy label={busyMessage || "Saving your memory"} />}
-            {createdId && !busy && (
-              <Link className="quiet-link" href={`/memory/${createdId}`}>
-                Open saved draft →
-              </Link>
-            )}
-            <p className="form-note">
-              Your draft stays private. You decide when to share.
-              <br />
-              Editing is available in this browser.
-            </p>
-          </form>
-        </section>
+        {storyOpen && (
+          <>
+            <section className="begin-section" id="begin">
+              <div className="begin-intro">
+                <div className="eyebrow">A PLACE TO BEGIN</div>
+                <h2>
+                  What takes you
+                  <br /> <em>back?</em>
+                </h2>
+                <p>
+                  It doesn’t have to be a big moment.
+                  <br />
+                  Sometimes the small ones hold everything.
+                </p>
+                <span className="hand-note">
+                  Let me show you
+                  <br />
+                  how I remember it.
+                </span>
+              </div>
+              <form className="paper form-card" onSubmit={create}>
+                <fieldset disabled={busy} className="capture-fields">
+                  <VoiceRecorder
+                    memoryId={createdId || undefined}
+                    ensureMemory={ensureDraft}
+                    onUse={acceptVoice}
+                    onSelect={(narrationId) =>
+                      setDraft((d) => ({ ...d, narrationId }))
+                    }
+                    onBusyChange={setCaptureBusy}
+                  />
+                  <StoryFields draft={draft} setDraft={setDraft} />
+                  <ReferencePhotos
+                    memoryId={createdId || undefined}
+                    ensureMemory={ensureDraft}
+                    onBusyChange={setReferenceBusy}
+                  />
+                </fieldset>
+                <ErrorNotice error={error} />
+                <button
+                  disabled={busy || captureBusy || referenceBusy}
+                  className="button primary wide"
+                  type="submit"
+                >
+                  {busy ? "Working on your memory…" : "Submit & generate image"}
+                  <ArrowRight size={18} />
+                </button>
+                <button
+                  type="button"
+                  className="button subtle wide"
+                  disabled={busy || captureBusy || referenceBusy}
+                  onClick={(e) => {
+                    if (e.currentTarget.form?.reportValidity())
+                      void createMode("details");
+                  }}
+                >
+                  Add details
+                </button>
+                {busy && <Busy label={busyMessage || "Saving your memory"} />}
+                {createdId && !busy && (
+                  <Link className="quiet-link" href={`/memory/${createdId}`}>
+                    Open saved draft →
+                  </Link>
+                )}
+                <p className="form-note">
+                  Your draft stays private. You decide when to share.
+                  <br />
+                  Editing is available in this browser.
+                </p>
+              </form>
+            </section>
+          </>
+        )}
       </main>
       <footer>
         <Brand />
@@ -731,40 +729,25 @@ export function Workspace({
     return (
       <>
         <Header />
-        <PhotoMemoryWorkspace
+        <PhotoFrameWorkspace
           memory={memory}
-          version={source}
-          onShare={async () => {
+          source={source}
+          initialVersionId={initialVersionId}
+          onGenerated={(v) =>
+            setMemory((m) =>
+              m
+                ? {
+                    ...m,
+                    versions: [...m.versions.filter((x) => x.id !== v.id), v],
+                  }
+                : m,
+            )
+          }
+          onShare={async (v) => {
             await load(true);
-            setSelected(source.id);
+            setSelected(v.id);
             setStage(3);
           }}
-          outsideFrame={
-            <OutsideFrameReveal
-              memoryId={id}
-              source={source}
-              versions={memory.versions}
-              initialVersionId={initialVersionId}
-              onGenerated={(v) =>
-                setMemory((m) =>
-                  m
-                    ? {
-                        ...m,
-                        versions: [
-                          ...m.versions.filter((x) => x.id !== v.id),
-                          v,
-                        ],
-                      }
-                    : m,
-                )
-              }
-              onShareWider={async (v) => {
-                await load(true);
-                setSelected(v.id);
-                setStage(3);
-              }}
-            />
-          }
         />
       </>
     );

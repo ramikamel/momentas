@@ -24,3 +24,9 @@ The fresh review’s two important findings—recording retries moving to anothe
 Deferred minor: the photo workspace uses manual annotation and neutral question fallback when preparation fails; dedicated retry buttons for failed cached object/question preparation remain future polish. Explicit noun refinement is available.
 
 Private live-test access state, recordings and generated images are ignored and excluded from source control and deployments. Public demonstrations should identify the fictional sample and prepared generated scene honestly.
+
+## Focused homepage and outside-frame follow-up
+
+The homepage now presents matching photograph/words choices; the story form opens only after selection. Existing-photo mode leads with the original and outside-frame recollection prompt, replacing the prompt with the wider result after generation. Detail stories are optional and not mounted/analyzed until requested. Reopening a saved wider scene restores its recollection for editing; completion is announced and editing restores keyboard focus. No schema/provider/security changes were needed.
+
+Validation:91unit/integration tests,17browser journeys, lint, TypeScript and production webpack build pass. New browser checks cover both entry choices, prompt placement, deferred object requests, mobile overflow and saved-recollection recovery. Desktop/mobile screenshots were inspected.

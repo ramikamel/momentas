@@ -8,7 +8,12 @@ test("a wider reconstruction shares frozen stories on the unchanged photo and ac
   await page
     .getByLabel("Choose your photograph")
     .setInputFiles(path.resolve("public/sample-memory.webp"));
-  await expect(page.getByAltText("Your original photograph")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Add stories to details", exact: true })
+    .click();
+  await expect(
+    page.getByAltText("Original photograph, unchanged"),
+  ).toBeVisible();
   await page.getByRole("button", { name: "helmet", exact: true }).click();
   await page
     .getByLabel("What do you remember about this?", { exact: true })

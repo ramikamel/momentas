@@ -44,11 +44,13 @@ export function PhotoMemoryWorkspace({
   version,
   onShare,
   outsideFrame,
+  embedded = false,
 }: {
   memory: AuthorMemoryView;
   version: ImageVersionView;
   onShare: (story: string, pins: PinDraft[]) => void;
   outsideFrame?: ReactNode;
+  embedded?: boolean;
 }) {
   const base = `/api/memories/${memory.id}`,
     vbase = `${base}/versions/${version.id}`;
@@ -307,12 +309,17 @@ export function PhotoMemoryWorkspace({
     }
   }
   const question = questions?.questions[drafts.story?.questionIndex || 0];
+  const Container = embedded ? "section" : "main";
   return (
-    <main className="photo-workspace">
+    <Container className={`photo-workspace ${embedded ? "is-embedded" : ""}`}>
       <header className="photo-heading">
         <a href="/library">← Your memory book</a>
         <span className="eyebrow">THE STORIES INSIDE A PHOTOGRAPH</span>
-        <h1>{memory.title || "A moment, remembered."}</h1>
+        {embedded ? (
+          <h2>Stories in the details.</h2>
+        ) : (
+          <h1>{memory.title || "A moment, remembered."}</h1>
+        )}
         <p>Look closer. What comes back to you?</p>
       </header>
       <div className="photo-layout">
@@ -609,6 +616,6 @@ export function PhotoMemoryWorkspace({
         <ReferencePhotos memoryId={memory.id} />
       </details>
       {outsideFrame}
-    </main>
+    </Container>
   );
 }

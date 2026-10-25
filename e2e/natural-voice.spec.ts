@@ -12,6 +12,9 @@ test("record on the opening page with blank metadata, stop auto inserts once whi
   page,
 }) => {
   await page.goto("/");
+  await page
+    .getByRole("button", { name: "Start with a memory", exact: true })
+    .click();
   let transcriptions = 0,
     uploads = 0;
   await page.route("**/narrations", async (route) => {

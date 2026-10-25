@@ -16,8 +16,13 @@ test("a photograph starts without metadata and detail drafts survive switching a
   await page
     .getByLabel("Choose your photograph")
     .setInputFiles(path.resolve("public/sample-memory.webp"));
+  await page
+    .getByRole("button", { name: "Add stories to details", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/memory\//);
-  await expect(page.getByAltText("Your original photograph")).toBeVisible();
+  await expect(
+    page.getByAltText("Original photograph, unchanged"),
+  ).toBeVisible();
   const mid = new URL(page.url()).pathname.split("/").pop()!;
   const initial = await (await page.request.get(`/api/memories/${mid}`)).json();
   expect(initial.title).toBe("A memory");
@@ -42,6 +47,9 @@ test("a photograph starts without metadata and detail drafts survive switching a
     page.getByLabel("What do you remember about this?", { exact: true }),
   ).toHaveValue("That helmet was a birthday present.");
   await page.reload();
+  await page
+    .getByRole("button", { name: "Add stories to details", exact: true })
+    .click();
   await page.getByRole("button", { name: "Detail 1", exact: true }).click();
   await expect(
     page.getByLabel("What do you remember about this?", { exact: true }),
@@ -63,7 +71,12 @@ test("failed masks leave an original photo and keyboard accessible manual detail
   await page
     .getByLabel("Choose your photograph")
     .setInputFiles(path.resolve("public/sample-memory.webp"));
-  await expect(page.getByAltText("Your original photograph")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Add stories to details", exact: true })
+    .click();
+  await expect(
+    page.getByAltText("Original photograph, unchanged"),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Choose a spot yourself", exact: true })
     .click();
@@ -86,7 +99,12 @@ test.describe("photo voice", () => {
     await page
       .getByLabel("Choose your photograph")
       .setInputFiles(path.resolve("public/sample-memory.webp"));
-    await expect(page.getByAltText("Your original photograph")).toBeVisible();
+    await page
+      .getByRole("button", { name: "Add stories to details", exact: true })
+      .click();
+    await expect(
+      page.getByAltText("Original photograph, unchanged"),
+    ).toBeVisible();
     const words = page.getByLabel("The story behind this photograph");
     await words.fill("My typed beginning.");
     let uploads = 0;
@@ -120,6 +138,9 @@ test.describe("photo voice", () => {
       page.getByText("Words saved privately.", { exact: true }),
     ).toBeVisible();
     await page.reload();
+    await page
+      .getByRole("button", { name: "Add stories to details", exact: true })
+      .click();
     await expect(words).toHaveValue("My final edited words.");
     await page.screenshot({
       path: testInfo.outputPath("photo-desktop.png"),
@@ -144,6 +165,9 @@ test("failed photo transcription resumes the original context after switching an
   await page
     .getByLabel("Choose your photograph")
     .setInputFiles(path.resolve("public/sample-memory.webp"));
+  await page
+    .getByRole("button", { name: "Add stories to details", exact: true })
+    .click();
   const words = page.getByLabel("The story behind this photograph");
   await expect(words).toBeVisible();
   await words.fill("The whole memory.");
@@ -185,6 +209,9 @@ test("failed photo transcription resumes the original context after switching an
   ).toBeVisible();
   await page.reload();
   await page
+    .getByRole("button", { name: "Add stories to details", exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Resume saved recording", exact: true })
     .click();
   await expect(words).toHaveValue(
@@ -204,6 +231,9 @@ test("a lost narration insertion response retries without duplicating the transc
   await page
     .getByLabel("Choose your photograph")
     .setInputFiles(path.resolve("public/sample-memory.webp"));
+  await page
+    .getByRole("button", { name: "Add stories to details", exact: true })
+    .click();
   const words = page.getByLabel("The story behind this photograph");
   await expect(words).toBeVisible();
   await words.fill("Before recording.");
@@ -234,6 +264,9 @@ test("a lost narration insertion response retries without duplicating the transc
     "Before recording.\n\nDad taught me to ride my bike in the parking lot.",
   );
   await page.reload();
+  await page
+    .getByRole("button", { name: "Add stories to details", exact: true })
+    .click();
   await expect(words).toHaveValue(
     "Before recording.\n\nDad taught me to ride my bike in the parking lot.",
   );

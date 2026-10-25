@@ -37,7 +37,7 @@ export function SavedPictures() {
           Your editing access is saved in this browser on this site. If a memory
           is missing, use the browser and site address where you created it.
         </p>
-        <Link className="button primary" href="/#begin">
+        <Link className="button primary" href="/#choose">
           Create a memory →
         </Link>
         {error && (

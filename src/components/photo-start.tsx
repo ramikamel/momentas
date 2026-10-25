@@ -83,37 +83,46 @@ export function PhotoStart({
     }
   }
   return (
-    <section className="photo-start">
-      <span className="eyebrow">A PHOTOGRAPH IS A BEGINNING</span>
-      <h2>There’s more to this picture.</h2>
-      <p>Bring a photograph. Tell the little stories hiding inside it.</p>
-      <input
-        ref={input}
-        aria-label="Choose your photograph"
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void upload(file);
-        }}
-      />
-      <button
-        className="button primary"
-        disabled={busy}
-        onClick={() =>
-          resumable ? void completeUpload() : input.current?.click()
-        }
-      >
-        {busy ? "Opening your photograph…" : "Start with a photograph"}
-      </button>
-      <small>Your original stays just as you remember it.</small>
-      {error && <p role="alert">{error}</p>}
-      {error && resumable && (
-        <button disabled={busy} onClick={() => void completeUpload()}>
-          Retry opening photo
+    <section className="photo-start" aria-label="Start from a photograph">
+      <div className="entry-photo-art" aria-hidden="true">
+        <img src="/sample-memory.webp" alt="" />
+        <span className="entry-photo-edge">THERE’S MORE BEYOND THE EDGES</span>
+      </div>
+      <div className="entry-card-copy">
+        <span className="eyebrow">START WITH A PHOTOGRAPH</span>
+        <h2>Go beyond the frame.</h2>
+        <p>
+          Bring a photograph and describe what the camera missed. See your
+          remembered surroundings come to life.
+        </p>
+        <input
+          ref={input}
+          aria-label="Choose your photograph"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void upload(file);
+          }}
+        />
+        <button
+          className="button primary"
+          disabled={busy}
+          onClick={() =>
+            resumable ? void completeUpload() : input.current?.click()
+          }
+        >
+          {busy ? "Opening your photograph…" : "Start with a photograph"}
         </button>
-      )}
+        <small>Your original stays just as you remember it.</small>
+        {error && <p role="alert">{error}</p>}
+        {error && resumable && (
+          <button disabled={busy} onClick={() => void completeUpload()}>
+            Retry opening photo
+          </button>
+        )}
+      </div>
     </section>
   );
 }
